@@ -1,0 +1,35 @@
+{
+  "source": "IP Viet Nam public trademark search",
+  "sourceUrl": "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/trademarks",
+  "lastUpdated": "2026-07-14",
+  "records": [
+    {
+      "markName": "L V",
+      "owner": "LOUIS VUITTON MALLETIER",
+      "applicationNo": "VN-4-2021-29707",
+      "registrationNo": "4-0467877-000",
+      "applicationDate": "2021-07-16",
+      "registrationDate": "2023-11-21",
+      "classes": [34],
+      "status": "已授权",
+      "wellKnown": true,
+      "visualBenchmark": true,
+      "thumbnailUrl": "/lv-placeholder.svg",
+      "sourceUrl": "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/trademarks?query=%22LOUIS%20VUITTON%20MALLETIER%22"
+    },
+    {
+      "markName": "NOUVEAU MONDE",
+      "owner": "LOUIS VUITTON MALLETIER",
+      "applicationNo": "VN-4-2020-03363",
+      "registrationNo": "4-0567709-000",
+      "applicationDate": "2020-02-06",
+      "registrationDate": "2025-09-04",
+      "classes": [3],
+      "status": "已授权",
+      "wellKnown": true,
+      "visualBenchmark": false,
+      "thumbnailUrl": "",
+      "sourceUrl": "https://wipopublish.ipvietnam.gov.vn/wopublish-search/public/trademarks?query=%22LOUIS%20VUITTON%20MALLETIER%22"
+    }
+  ]
+}

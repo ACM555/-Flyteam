@@ -330,8 +330,16 @@ function Report() {
       <Card
         title="防御性合规规划书（预览）"
         extra={
-          <Tooltip title="功能开发中">
-            <Button disabled icon={<DownloadOutlined />}>
+          <Tooltip title={advice.documentDownloadUrl ? '下载 PDF 合规规划书' : '报告尚未生成'}>
+            <Button
+              disabled={!advice.documentDownloadUrl}
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                if (advice.documentDownloadUrl) {
+                  window.open(advice.documentDownloadUrl, '_blank', 'noopener,noreferrer')
+                }
+              }}
+            >
               下载完整文书
             </Button>
           </Tooltip>

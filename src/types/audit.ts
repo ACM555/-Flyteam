@@ -105,6 +105,7 @@ export interface AuditResult {
       description: string
     }>
     documentPreview: string
+    documentDownloadUrl?: string
   }
 }
 
