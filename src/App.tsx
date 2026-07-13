@@ -14,6 +14,7 @@ function App() {
           <Route path="submit" element={<Submit />} />
           <Route path="reviewing" element={<Reviewing />} />
           <Route path="report" element={<Report />} />
+          <Route path="report/:taskId" element={<Report />} />
         </Route>
       </Routes>
     </BrowserRouter>

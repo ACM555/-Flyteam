@@ -1,58 +1,208 @@
 import {
+  ArrowRightOutlined,
   FileProtectOutlined,
+  FileTextOutlined,
   SafetyCertificateOutlined,
   SolutionOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Row, Space, Typography } from 'antd'
+import { Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+const { Paragraph, Text, Title } = Typography
+
+const statistics = [
+  {
+    title: '已审查品牌',
+    value: 128,
+    suffix: '个',
+    color: '#1677ff',
+    icon: <SafetyCertificateOutlined />,
+  },
+  {
+    title: '拦截高风险',
+    value: 37,
+    suffix: '项',
+    color: '#ff4d4f',
+    icon: <WarningOutlined />,
+  },
+  {
+    title: '法条覆盖',
+    value: 5,
+    suffix: '类',
+    color: '#52c41a',
+    icon: <FileTextOutlined />,
+  },
+]
 
 const capabilities = [
   {
     title: '商标合规扫描',
-    description: '快速识别越南商标注册与使用环节中的合规要点。',
-    icon: <SafetyCertificateOutlined style={{ color: '#1677ff', fontSize: 28 }} />,
+    description: '围绕越南商标注册审查规则，快速识别绝对驳回与相对驳回风险。',
+    hint: '适合提交前快速体检',
+    icon: <SafetyCertificateOutlined />,
+    color: '#1677ff',
+    background: '#f0f5ff',
   },
   {
     title: '法律风险预警',
-    description: '结合审查规则与风险信号，为出海决策提前预警。',
-    icon: <FileProtectOutlined style={{ color: '#1677ff', fontSize: 28 }} />,
+    description: '结合本地规则库、冲突品牌库和判例线索，提前发现跨类攀附风险。',
+    hint: '适合出海品牌风控评估',
+    icon: <FileProtectOutlined />,
+    color: '#faad14',
+    background: '#fffbe6',
   },
   {
     title: '防御文书生成',
-    description: '沉淀审查结论，为后续沟通与应对提供文书基础。',
-    icon: <SolutionOutlined style={{ color: '#1677ff', fontSize: 28 }} />,
+    description: '把审查结论沉淀为合规建议和防御性规划书，辅助团队后续应对。',
+    hint: '适合法务与业务同步决策',
+    icon: <SolutionOutlined />,
+    color: '#52c41a',
+    background: '#f6ffed',
   },
 ]
 
 function Home() {
   const navigate = useNavigate()
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
 
   return (
     <Space direction="vertical" size={24} style={{ display: 'flex' }}>
-      <div>
-        <Typography.Title level={2}>Outbound-Guard 越南商标合规智能体</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ fontSize: 16, maxWidth: 720 }}>
-          面向中国企业出海东南亚的商标合规扫描工作台。提交品牌资料后，智能体将辅助完成规则匹配、视觉比对与风险评估。
-        </Typography.Paragraph>
+      <div
+        style={{
+          background:
+            'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.28) 0, rgba(255,255,255,0) 30%), linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)',
+          borderRadius: 16,
+          boxShadow: '0 16px 40px rgba(22, 119, 255, 0.22)',
+          color: '#fff',
+          overflow: 'hidden',
+          padding: '48px 40px',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.14)',
+            borderRadius: 999,
+            height: 180,
+            position: 'absolute',
+            right: -56,
+            top: -72,
+            width: 180,
+          }}
+        />
+        <div style={{ maxWidth: 720, position: 'relative', zIndex: 1 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+            越南出海商标合规智能体
+          </Text>
+          <Title level={1} style={{ color: '#fff', margin: '10px 0 12px' }}>
+            Outbound-Guard
+          </Title>
+          <Paragraph
+            style={{
+              color: 'rgba(255,255,255,0.88)',
+              fontSize: 16,
+              lineHeight: 1.8,
+              marginBottom: 28,
+              maxWidth: 620,
+            }}
+          >
+            零幻觉法条级审查，秒级识别跨类攀附风险。为中国企业出海东南亚提供商标提交前的智能扫描、风险预警与合规建议。
+          </Paragraph>
+          <Space size={12} wrap>
+            <Button
+              ghost
+              icon={<ArrowRightOutlined />}
+              onClick={() => navigate('/submit')}
+              size="large"
+              style={{ borderColor: '#fff', color: '#fff' }}
+              type="primary"
+            >
+              立即开始审查
+            </Button>
+            <Text style={{ color: 'rgba(255,255,255,0.76)' }}>预计 3-5 秒生成初步报告</Text>
+          </Space>
+        </div>
       </div>
-      <Row gutter={[24, 24]}>
-        {capabilities.map((capability, index) => (
-          <Col key={capability.title} xs={24} md={index === 0 ? 12 : 6} lg={index === 0 ? 12 : 6}>
-            <Card style={{ minHeight: 216 }}>
-              <Space direction="vertical" size={16}>
-                {capability.icon}
-                <Typography.Title level={4} style={{ margin: 0 }}>
-                  {capability.title}
-                </Typography.Title>
-                <Typography.Paragraph type="secondary">{capability.description}</Typography.Paragraph>
-                <Button type="primary" onClick={() => navigate('/submit')}>
-                  开始使用
-                </Button>
-              </Space>
+
+      <Row gutter={[16, 16]}>
+        {statistics.map((item) => (
+          <Col key={item.title} xs={24} sm={8}>
+            <Card>
+              <Statistic
+                prefix={<span style={{ color: item.color }}>{item.icon}</span>}
+                suffix={item.suffix}
+                title={item.title}
+                value={item.value}
+                valueStyle={{ color: item.color, fontWeight: 700 }}
+              />
             </Card>
           </Col>
         ))}
       </Row>
+
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          核心能力
+        </Title>
+        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          从提交、审查到报告输出，覆盖出海商标合规评估的关键节点。
+        </Paragraph>
+        <Row gutter={[20, 20]}>
+          {capabilities.map((capability) => {
+            const isHovered = hoveredCard === capability.title
+
+            return (
+              <Col key={capability.title} xs={24} md={12} lg={8}>
+                <Card
+                  hoverable
+                  onClick={() => navigate('/submit')}
+                  onMouseEnter={() => setHoveredCard(capability.title)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{
+                    boxShadow: isHovered ? '0 10px 28px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
+                    cursor: 'pointer',
+                    height: '100%',
+                    minHeight: 238,
+                    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: capability.background,
+                        borderRadius: 12,
+                        color: capability.color,
+                        display: 'flex',
+                        fontSize: 28,
+                        height: 56,
+                        justifyContent: 'center',
+                        width: 56,
+                      }}
+                    >
+                      {capability.icon}
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {capability.title}
+                    </Title>
+                    <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                      {capability.description}
+                    </Paragraph>
+                    <Text type="secondary">{capability.hint}</Text>
+                  </Space>
+                </Card>
+              </Col>
+            )
+          })}
+        </Row>
+      </div>
+
+      <div style={{ padding: '40px 0 20px', textAlign: 'center' }}>
+        <Text type="secondary">Outbound-Guard v1.0.0 · 越南出海商标合规智能体</Text>
+      </div>
     </Space>
   )
 }
