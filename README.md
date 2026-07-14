@@ -22,4 +22,15 @@ npm run dev -- --host 127.0.0.1
 - 后端接口文档：<http://127.0.0.1:8000/docs>
 - 健康检查：<http://127.0.0.1:8000/api/health>
 
-更多后端配置、数据刷新和测试方式见 `backend/README.md`。
+## 测试与构建
+
+```powershell
+npm test
+npm run test:e2e
+npm run build
+
+cd backend
+.\.venv\Scripts\python.exe -m pytest
+```
+
+端到端测试会联调真实 Vite 与 FastAPI 服务，覆盖高危/低危审查、非法文件、PDF、四档响应式和无障碍扫描。视觉规范见 `design-system/MASTER.md`，更多后端配置与数据刷新方式见 `backend/README.md`。

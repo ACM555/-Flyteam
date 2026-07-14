@@ -1,65 +1,57 @@
 import {
   AuditOutlined,
   CheckCircleOutlined,
+  FileDoneOutlined,
+  FileSearchOutlined,
   LoadingOutlined,
+  PictureOutlined,
+  ReloadOutlined,
   SafetyOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Progress, Result, Space, Spin, Steps, Typography } from 'antd'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Alert, Button, Card, Progress, Skeleton, Space, Typography } from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { getAuditResult } from '@/api/audit'
+import type { AuditResult } from '@/types/audit'
 
 const { Paragraph, Text, Title } = Typography
 
-type ReviewingRouteState = {
-  taskId?: string
-}
-
+type ReviewingRouteState = { taskId?: string }
 type ReviewingStatus = 'loading' | 'success' | 'error' | 'timeout'
 
-const reviewSteps = [
-  {
-    title: '法条规则匹配',
-    description: '检索越南《工业产权法》第72-76条绝对/相对驳回条款',
-  },
-  {
-    title: '多模态视觉比对',
-    description: 'OpenCV 图像预处理 + 视觉大模型几何特征对齐',
-  },
-  {
-    title: '风险综合评估',
-    description: '汇总法条 + 视觉结果，生成合规风险报告',
-  },
+const reviewStages = [
+  { title: '任务初始化', description: '校验资料并建立安全分析任务。', threshold: 15, icon: <AuditOutlined /> },
+  { title: '图形分析', description: '提取形状、结构、对称性与视觉特征。', threshold: 45, icon: <PictureOutlined /> },
+  { title: '绝对理由审查', description: '匹配不得注册与缺乏显著性的规则。', threshold: 65, icon: <SafetyOutlined /> },
+  { title: '相对理由检索', description: '检索冲突商标、权利人和判例线索。', threshold: 78, icon: <FileSearchOutlined /> },
+  { title: '生成证据报告', description: '汇总风险结论、来源和改进建议。', threshold: 100, icon: <FileDoneOutlined /> },
 ]
 
 function Reviewing() {
   const navigate = useNavigate()
   const location = useLocation()
-  const taskId = (location.state as ReviewingRouteState | null)?.taskId
-  const [currentStep, setCurrentStep] = useState(0)
+  const [searchParams] = useSearchParams()
+  const routeTaskId = (location.state as ReviewingRouteState | null)?.taskId
+  const taskId = routeTaskId ?? searchParams.get('taskId') ?? undefined
   const [status, setStatus] = useState<ReviewingStatus>('loading')
-  const [errorMsg, setErrorMsg] = useState('')
-  const [progress, setProgress] = useState(0)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [result, setResult] = useState<AuditResult | null>(null)
   const timerRef = useRef<number | null>(null)
   const navigateTimerRef = useRef<number | null>(null)
   const startTimeRef = useRef(Date.now())
 
   const clearTimers = useCallback(() => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-
-    if (navigateTimerRef.current) {
-      window.clearTimeout(navigateTimerRef.current)
-      navigateTimerRef.current = null
-    }
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    if (navigateTimerRef.current) window.clearTimeout(navigateTimerRef.current)
+    timerRef.current = null
+    navigateTimerRef.current = null
   }, [])
 
   const poll = useCallback(async () => {
     if (!taskId) {
       setStatus('error')
-      setErrorMsg('缺少任务ID，请从提交页重新进入')
+      setErrorMessage('缺少任务 ID，请从商标提交页重新进入。')
       return
     }
 
@@ -70,147 +62,137 @@ function Reviewing() {
     }
 
     try {
-      const result = await getAuditResult(taskId)
-      const nextStep = Math.min(result.currentStep ?? 0, reviewSteps.length - 1)
-      const nextProgress =
-        result.progress || Math.round(((nextStep + 1) / reviewSteps.length) * 100)
+      const nextResult = await getAuditResult(taskId)
+      setResult(nextResult)
 
-      setCurrentStep(nextStep)
-      setProgress(nextProgress)
-
-      if (result.status === 'done') {
+      if (nextResult.status === 'done') {
         clearTimers()
         setStatus('success')
-        setCurrentStep(reviewSteps.length - 1)
-        setProgress(100)
         navigateTimerRef.current = window.setTimeout(() => {
           navigate(`/report/${taskId}`, { state: { taskId } })
-        }, 800)
+        }, 900)
         return
       }
 
-      if (result.status === 'error') {
+      if (nextResult.status === 'error') {
         clearTimers()
         setStatus('error')
-        setErrorMsg(result.errorMessage || result.summary?.overallResult || '审查过程中发生未知错误')
+        setErrorMessage(nextResult.errorMessage || '后端审查任务执行失败。')
         return
       }
 
-      timerRef.current = window.setTimeout(poll, 2000)
+      timerRef.current = window.setTimeout(poll, 1200)
     } catch {
       clearTimers()
       setStatus('error')
-      setErrorMsg('网络请求失败，请确认后端服务已启动')
+      setErrorMessage('无法连接后端服务，请确认 FastAPI 已启动。')
     }
   }, [clearTimers, navigate, taskId])
-
-  const handleRetry = () => {
-    clearTimers()
-    startTimeRef.current = Date.now()
-    setCurrentStep(0)
-    setProgress(0)
-    setErrorMsg('')
-    setStatus('loading')
-    poll()
-  }
 
   useEffect(() => {
     startTimeRef.current = Date.now()
     poll()
-
     return clearTimers
   }, [clearTimers, poll])
 
-  const stepItems = reviewSteps.map((step, index) => {
-    const isFinished = status === 'success' || currentStep > index
-    const isCurrent = status === 'loading' && currentStep === index
+  const progress = status === 'success' ? 100 : result?.progress ?? 0
+  const activeStage = useMemo(() => {
+    const index = reviewStages.findIndex((stage) => progress < stage.threshold)
+    return index === -1 ? reviewStages.length - 1 : index
+  }, [progress])
 
-    return {
-      title: step.title,
-      description: step.description,
-      icon: isFinished ? (
-        <CheckCircleOutlined style={{ color: '#52c41a' }} />
-      ) : isCurrent ? (
-        <LoadingOutlined style={{ color: '#1677ff' }} />
-      ) : (
-        <AuditOutlined />
-      ),
-    }
-  })
-
-  if (status === 'error') {
-    return (
-      <Result
-        status="error"
-        title="审查失败"
-        subTitle={errorMsg || '审查过程中发生未知错误'}
-        extra={[
-          <Button type="primary" key="retry" onClick={handleRetry} disabled={!taskId}>
-            重新审查
-          </Button>,
-          <Button key="submit" onClick={() => navigate('/submit')}>
-            返回修改
-          </Button>,
-        ]}
-      />
-    )
-  }
-
-  if (status === 'timeout') {
-    return (
-      <Result
-        status="warning"
-        title="审查超时"
-        subTitle="服务器响应时间超过 60 秒，可能由于网络延迟或服务负载过高"
-        extra={[
-          <Button type="primary" key="retry" onClick={handleRetry}>
-            重新审查
-          </Button>,
-          <Button key="submit" onClick={() => navigate('/submit')}>
-            返回提交页
-          </Button>,
-        ]}
-      />
-    )
+  const handleRetry = () => {
+    clearTimers()
+    startTimeRef.current = Date.now()
+    setErrorMessage('')
+    setStatus('loading')
+    poll()
   }
 
   return (
-    <Card style={{ margin: '48px auto', maxWidth: 640 }}>
-      <Space direction="vertical" size={28} style={{ display: 'flex' }}>
-        <div style={{ textAlign: 'center' }}>
-          <Spin
-            spinning={status === 'loading'}
-            indicator={<LoadingOutlined style={{ fontSize: 32 }} spin />}
-          >
-            <SafetyOutlined
-              style={{
-                color: status === 'success' ? '#52c41a' : '#1677ff',
-                fontSize: 52,
-                marginBottom: 16,
-              }}
-            />
-          </Spin>
-          <Title level={2} style={{ margin: '12px 0 8px' }}>
-            {status === 'success' ? '审查完成' : 'AI 合规审查中...'}
-          </Title>
-          <Text type="secondary">
-            {status === 'success' ? '审查完成，正在跳转报告页...' : '预计耗时 3-5 秒，请勿关闭页面'}
-          </Text>
-        </div>
+    <div className="page-shell reviewing-page">
+      <header className="page-header">
+        <Text className="page-kicker">任务 {taskId ? taskId.slice(0, 8) : '未建立'}</Text>
+        <Title className="page-title">审查进度</Title>
+        <Paragraph className="page-description">
+          系统正在依次执行图形分析、法律规则匹配、冲突检索和报告生成。
+        </Paragraph>
+      </header>
 
+      {(status === 'error' || status === 'timeout') && (
+        <Alert
+          action={
+            <Space wrap>
+              <Button disabled={!taskId} icon={<ReloadOutlined />} onClick={handleRetry} type="primary">
+                重新获取状态
+              </Button>
+              <Button onClick={() => navigate('/submit')}>返回修改资料</Button>
+            </Space>
+          }
+          className="review-alert"
+          description={status === 'timeout' ? '服务器超过 60 秒未返回最终结果，可以重试获取状态。' : errorMessage}
+          message={status === 'timeout' ? '审查等待超时' : '审查任务异常'}
+          showIcon
+          type={status === 'timeout' ? 'warning' : 'error'}
+        />
+      )}
+
+      <Card className="surface-card review-progress-card">
+        <div className="review-progress-summary">
+          <div>
+            <Text className="review-status-label">
+              {status === 'success' ? <CheckCircleOutlined /> : status === 'loading' ? <LoadingOutlined spin /> : <WarningOutlined />}
+              {status === 'success' ? '审查完成' : status === 'loading' ? '正在处理' : '需要处理'}
+            </Text>
+            <Title level={3}>{result?.brandName || '正在读取商标资料'}</Title>
+            <Paragraph>{result?.niceClass || '等待后端返回任务信息'}</Paragraph>
+          </div>
+          <div className="review-progress-number" aria-label={`当前进度 ${progress}%`}>{progress}%</div>
+        </div>
         <Progress
+          aria-label="审查总进度"
           percent={progress}
-          status={status === 'success' ? 'success' : 'active'}
-          strokeColor={status === 'success' ? '#52c41a' : '#1677ff'}
+          showInfo={false}
+          status={status === 'error' ? 'exception' : status === 'success' ? 'success' : 'active'}
+          strokeColor="#006a6a"
         />
 
-        <Steps current={currentStep} direction="vertical" items={stepItems} />
+        <div className="review-timeline">
+          {reviewStages.map((stage, index) => {
+            const complete = status === 'success' || progress >= stage.threshold
+            const active = status === 'loading' && activeStage === index
+            const failed = status === 'error' && activeStage === index
 
-        <Paragraph type="secondary" style={{ margin: 0, textAlign: 'center' }}>
-          {taskId ? `任务ID：${taskId}` : '正在等待任务ID'}
-        </Paragraph>
-      </Space>
-    </Card>
+            return (
+              <section
+                className={`review-stage${complete ? ' review-stage--complete' : ''}${active ? ' review-stage--active' : ''}${failed ? ' review-stage--failed' : ''}`}
+                key={stage.title}
+              >
+                <div className="review-stage-icon" aria-hidden="true">
+                  {complete ? <CheckCircleOutlined /> : active ? <LoadingOutlined spin /> : failed ? <WarningOutlined /> : stage.icon}
+                </div>
+                <div className="review-stage-content">
+                  <div className="review-stage-heading">
+                    <Title level={4}>{stage.title}</Title>
+                    <Text>{complete ? '已完成' : active ? '处理中' : failed ? '失败' : '等待中'}</Text>
+                  </div>
+                  <Paragraph>{stage.description}</Paragraph>
+                  {active && <Skeleton active className="review-stage-skeleton" paragraph={{ rows: 2 }} title={false} />}
+                  {failed && <Paragraph className="review-stage-error">{errorMessage}</Paragraph>}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      </Card>
+
+      <div className="review-footer-actions">
+        <Button onClick={() => navigate('/')}>返回数据概览</Button>
+        {status === 'success' && taskId && (
+          <Button onClick={() => navigate(`/report/${taskId}`)} type="primary">立即查看报告</Button>
+        )}
+      </div>
+    </div>
   )
 }
 

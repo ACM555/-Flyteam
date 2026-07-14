@@ -5,6 +5,7 @@ import type {
   AuditResult,
   HitRule,
   LegalReference,
+  StatisticsData,
   UnifiedResponse,
 } from '@/types/audit'
 
@@ -22,6 +23,11 @@ export async function audit(data: AuditRequest): Promise<AuditResponse> {
 export async function getAuditResult(taskId: string): Promise<AuditResult> {
   const res = (await request.get(`/audit/result/${taskId}`)) as UnifiedResponse<RawAuditResult>
   return normalizeAuditResult(res.data)
+}
+
+export async function getStatistics(): Promise<StatisticsData> {
+  const res = (await request.get('/statistics')) as UnifiedResponse<StatisticsData>
+  return res.data
 }
 
 type RawHitRule = Partial<HitRule>

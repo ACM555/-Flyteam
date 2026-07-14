@@ -3,6 +3,9 @@ dist
 .npm-cache
 .playwright-cli
 output
+coverage
+playwright-report
+test-results
 backend/.venv
 backend/.env
 backend/.pytest_cache

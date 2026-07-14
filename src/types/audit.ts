@@ -9,6 +9,11 @@ export interface AuditRequest {
 
 export type AuditFormData = AuditRequest
 
+export interface StatisticsData {
+  auditedBrands: number
+  highRiskBlocked: number
+}
+
 export interface AuditResponse {
   code: number
   message: string

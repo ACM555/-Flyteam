@@ -1,5 +1,5 @@
 import { DeleteOutlined, InboxOutlined } from '@ant-design/icons'
-import { App as AntdApp, Button, Spin, Upload } from 'antd'
+import { App as AntdApp, Button, Spin, Upload, Typography } from 'antd'
 import type { RcFile } from 'antd/es/upload/interface'
 import { useEffect, useState } from 'react'
 
@@ -69,30 +69,19 @@ function LogoUpload({ onChange, value }: LogoUploadProps) {
   }
 
   const preview = (
-    <div style={{ height: 128, position: 'relative', width: 128 }}>
+    <div className="logo-preview">
       <img
-        alt="Logo"
+        alt="已上传的商标 Logo 预览"
+        className="logo-preview-image"
         src={previewUrl}
-        style={{
-          border: '1px solid #d9d9d9',
-          borderRadius: 12,
-          height: 128,
-          objectFit: 'cover',
-          width: 128,
-        }}
       />
       <Button
         danger
         aria-label="删除 Logo"
+        className="logo-preview-remove"
         icon={<DeleteOutlined />}
         onClick={handleRemove}
         shape="circle"
-        size="small"
-        style={{
-          position: 'absolute',
-          right: -8,
-          top: -8,
-        }}
       />
     </div>
   )
@@ -103,20 +92,25 @@ function LogoUpload({ onChange, value }: LogoUploadProps) {
       beforeUpload={handleFile}
       maxCount={1}
       showUploadList={false}
-      style={{ maxWidth: 420 }}
+      className="logo-uploader"
     >
       <p className="ant-upload-drag-icon">
         <InboxOutlined />
       </p>
-      <p className="ant-upload-text">点击或拖拽 Logo 至此区域</p>
-      <p className="ant-upload-hint">支持 JPG / PNG，单张 ≤5MB</p>
+      <p className="ant-upload-text">点击或拖拽上传商标 Logo</p>
+      <p className="ant-upload-hint">仅支持 JPG / PNG，单张不超过 5MB</p>
     </Upload.Dragger>
   )
 
   return (
-    <Spin spinning={loading} tip="处理中...">
-      {previewUrl ? preview : dragger}
-    </Spin>
+    <div className="logo-upload-field">
+      <Spin spinning={loading} tip="正在读取图片">
+        {previewUrl ? preview : dragger}
+      </Spin>
+      <Typography.Text className="field-help">
+        图片只用于本次图形特征分析，任务完成后上传文件将被清理。
+      </Typography.Text>
+    </div>
   )
 }
 
