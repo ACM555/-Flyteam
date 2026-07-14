@@ -55,6 +55,78 @@ type RawAuditResult = Partial<AuditResult> & {
   radarData?: AuditResult['visual']['radarData']
   matchedBrands?: AuditResult['visual']['matchedBrands']
   documentPreview?: string
+  registrationStrategy?: AuditResult['registrationStrategy']
+}
+
+function buildFallbackRegistrationStrategy(
+  goodsServices: string,
+  niceClass: string,
+): AuditResult['registrationStrategy'] {
+  const targetMarkets = ['越南']
+  const hasBroadDescription = goodsServices.trim().length <= 12
+  return {
+    targetMarkets,
+    hasChinaBase: false,
+    recommendedPath: '单国申请',
+    reason: '当前报告未包含跨域策略字段，系统按默认目标市场“越南”生成单国申请建议。目标市场不超过 2 国时，单国申请更直接，便于按当地审查口径快速处理。',
+    costSaving: '成本节省不是当前主要目标，重点是越南本地检索、商品/服务描述细化和代理人复核。',
+    costComparison: [
+      {
+        option: '单国申请',
+        costLevel: '低-中',
+        speed: '较快',
+        suitableFor: '目标市场集中在越南或不超过 2 个国家',
+        note: '流程直接，适合先完成越南市场落地。',
+      },
+      {
+        option: '马德里体系',
+        costLevel: '中',
+        speed: '中等',
+        suitableFor: '3 个以上目标市场，且已有中国基础商标/申请',
+        note: '多国布局通常可节省约 40-60% 的重复申请成本。',
+      },
+      {
+        option: '单国 + 马德里混合',
+        costLevel: '中-高',
+        speed: '核心市场较快，其余市场统一推进',
+        suitableFor: '包含越南、泰国、印尼等核心市场，同时需要多国防御布局',
+        note: '核心市场单国优先，其余市场用马德里体系补齐覆盖。',
+      },
+    ],
+    timeline: [
+      {
+        stage: '提交前检索',
+        duration: '1-2 周',
+        action: '完成越南市场文字、图形和商品/服务近似检索。',
+      },
+      {
+        stage: '本地化确认',
+        duration: '1-2 周',
+        action: '由越南代理人确认商品/服务描述和尼斯分类。',
+      },
+      {
+        stage: '单国申请',
+        duration: '2-4 周',
+        action: '准备并提交越南单国申请材料。',
+      },
+      {
+        stage: '审查跟踪',
+        duration: '持续',
+        action: '跟踪补正、异议和后续风险变化。',
+      },
+    ],
+    localizedGoodsServices: [
+      {
+        market: '越南',
+        original: goodsServices || '未填写商品/服务描述',
+        localized: hasBroadDescription
+          ? `${niceClass || '对应类别'}：请将“${goodsServices || '商品/服务'}”细化为具体服务场景、销售渠道、主要品类和目标消费对象。`
+          : `${niceClass || '对应类别'}：${goodsServices}。建议补充越南语/英文对应描述，并拆分过宽泛项目。`,
+        note: '越南不宜使用过宽泛商品/服务描述，建议按本地可接受注释细化。',
+      },
+    ],
+    risks: ['正式提交前仍需由越南当地代理人复核商品/服务描述和在先权利检索结果。'],
+  }
 }
 
 function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResult {
@@ -73,6 +145,8 @@ function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResu
   const riskScore = safeRaw.riskScore ?? safeRaw.summary?.riskScore ?? 0
   const overallResult = safeRaw.overallResult ?? safeRaw.summary?.overallResult ?? ''
   const normalizedHitRules = hitRules.map((rule): HitRule => ({
+    ruleId: rule.ruleId,
+    ruleName: rule.ruleName,
     ruleType: rule.ruleType ?? 'absolute',
     article: rule.article ?? '未命名法条',
     content: rule.content ?? '',
@@ -154,5 +228,7 @@ function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResu
       })),
       documentPreview: safeRaw.documentPreview ?? '',
     },
+    registrationStrategy:
+      safeRaw.registrationStrategy ?? buildFallbackRegistrationStrategy(goodsServices, niceClass),
   }
 }

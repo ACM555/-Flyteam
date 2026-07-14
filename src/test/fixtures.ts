@@ -1,7 +1,7 @@
 import type { AuditResult } from '@/types/audit'
 
 export function createAuditResult(overrides: Partial<AuditResult> = {}): AuditResult {
-  return {
+  const base: AuditResult = {
     taskId: 'task-001',
     status: 'done',
     currentStep: 2,
@@ -26,6 +26,22 @@ export function createAuditResult(overrides: Partial<AuditResult> = {}): AuditRe
     relative: { hasRisk: true, conflicts: [], precedents: [] },
     visual: { radarData: [], matchedBrands: [] },
     advice: { recommendations: [], documentPreview: '', documentDownloadUrl: '/api/audit/report/task-001/pdf' },
+    registrationStrategy: {
+      targetMarkets: ['越南'],
+      hasChinaBase: false,
+      recommendedPath: '单国申请',
+      reason: '目标市场较少，优先采用单国申请路径。',
+      costSaving: '以稳定性优先',
+      costComparison: [],
+      timeline: [],
+      localizedGoodsServices: [],
+      risks: [],
+    },
+  }
+
+  return {
+    ...base,
     ...overrides,
+    registrationStrategy: overrides.registrationStrategy ?? base.registrationStrategy,
   }
 }

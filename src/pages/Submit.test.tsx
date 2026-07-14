@@ -11,11 +11,11 @@ describe('Submit', () => {
     const user = userEvent.setup()
     renderWithProviders(<Submit />, '/submit')
 
-    await user.click(screen.getByRole('button', { name: '提交并开始审查' }))
+    await user.click(screen.getByRole('button', { name: '提交审查' }))
 
-    expect(await screen.findByText('请输入商标名称')).toBeInTheDocument()
+    expect(await screen.findByText('请输入品牌名称')).toBeInTheDocument()
     expect(screen.getByText('请选择尼斯分类')).toBeInTheDocument()
-    expect(screen.getByText('请输入商品或服务描述')).toBeInTheDocument()
+    expect(screen.getByText('请输入商品/服务描述')).toBeInTheDocument()
     expect(screen.getByText('请上传品牌 Logo')).toBeInTheDocument()
   })
 })

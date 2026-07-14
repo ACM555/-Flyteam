@@ -1,25 +1,23 @@
 import {
-  DownloadOutlined,
-  FileTextOutlined,
-  PictureOutlined,
-  SafetyCertificateOutlined,
-  WarningOutlined,
-} from '@ant-design/icons'
-import {
   Alert,
   Button,
   Card,
+  Col,
   Empty,
   Image,
   List,
   Progress,
   Result,
+  Row,
   Skeleton,
   Space,
+  Steps,
+  Table,
   Tabs,
   Tag,
   Typography,
 } from 'antd'
+import type { TableColumnsType } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -31,26 +29,70 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { getAuditResult } from '@/api/audit'
+import ComplianceModuleGrid from '@/components/ComplianceModuleGrid'
+import DocumentPreviewCard from '@/components/DocumentPreviewCard'
 import HitRuleList from '@/components/HitRuleList'
 import LegalReferenceCollapse from '@/components/LegalReferenceCollapse'
+import ReportActionPanel from '@/components/ReportActionPanel'
 import RiskSummaryCard from '@/components/RiskSummaryCard'
 import type { AuditResult } from '@/types/audit'
+import { getCurrentTaskId, setCurrentTaskId } from '@/utils/auditHistory'
 
 const { Paragraph, Text, Title } = Typography
 
-const priorityConfig = {
-  P0: { color: 'red', label: '立即处理' },
-  P1: { color: 'orange', label: '优先优化' },
-  P2: { color: 'blue', label: '持续关注' },
+const reviewSteps = [
+  { title: '法条规则匹配' },
+  { title: '多模态视觉比对' },
+  { title: '风险综合评估' },
+]
+
+const priorityColor = {
+  P0: 'red',
+  P1: 'orange',
+  P2: 'blue',
 } as const
 
-type ReportRouteState = { taskId?: string }
+type Conflict = AuditResult['relative']['conflicts'][number]
+
+const conflictColumns: TableColumnsType<Conflict> = [
+  { title: '品牌名称', dataIndex: 'brandName', key: 'brandName' },
+  { title: '注册类别', dataIndex: 'registeredClass', key: 'registeredClass' },
+  { title: '注册号', dataIndex: 'registrationNo', key: 'registrationNo' },
+  { title: '相似类型', dataIndex: 'similarityType', key: 'similarityType' },
+  {
+    title: '相似度',
+    dataIndex: 'similarityScore',
+    key: 'similarityScore',
+    render: (score: number) => (
+      <Progress percent={score} status={score >= 80 ? 'exception' : 'normal'} size="small" />
+    ),
+  },
+]
+
+type ReportRouteState = {
+  taskId?: string
+}
+
+function StatisticLike({ title, value }: { title: string; value: string }) {
+  return (
+    <Space direction="vertical" size={4} style={{ display: 'flex' }}>
+      <Text type="secondary">{title}</Text>
+      <Text strong style={{ fontSize: 16 }}>
+        {value}
+      </Text>
+    </Space>
+  )
+}
+
+function isRecommendedOption(option: string, recommendedPath: string) {
+  return recommendedPath === option || recommendedPath.includes(option)
+}
 
 function Report() {
   const location = useLocation()
   const navigate = useNavigate()
   const params = useParams<{ taskId?: string }>()
-  const taskId = params.taskId ?? (location.state as ReportRouteState | null)?.taskId
+  const taskId = params.taskId ?? (location.state as ReportRouteState | null)?.taskId ?? getCurrentTaskId()
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,14 +100,18 @@ function Report() {
 
   useEffect(() => {
     if (!taskId) {
-      setError('缺少任务 ID，请从提交页重新进入。')
+      setError('当前没有可查看的审查报告，请先提交品牌信息。')
       setLoading(false)
       return undefined
     }
 
+    setCurrentTaskId(taskId)
+
     const clearTimer = () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current)
-      timerRef.current = null
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
     }
 
     const poll = async () => {
@@ -81,15 +127,15 @@ function Report() {
 
         if (nextResult.status === 'error') {
           clearTimer()
-          setError(nextResult.errorMessage || nextResult.summary?.overallResult || '审查任务执行失败。')
+          setError(`审查失败：${nextResult.errorMessage || nextResult.summary.overallResult || '未知错误'}`)
           setLoading(false)
           return
         }
 
-        timerRef.current = window.setTimeout(poll, 1200)
+        timerRef.current = window.setTimeout(poll, 2000)
       } catch {
         clearTimer()
-        setError('无法读取审查报告，请确认 FastAPI 服务已启动。')
+        setError('任务不存在或后端服务已重启，请返回提交页重新提交。')
         setLoading(false)
       }
     }
@@ -97,258 +143,342 @@ function Report() {
     setLoading(true)
     setError(null)
     poll()
+
     return clearTimer
   }, [taskId])
 
   if (error) {
     return (
-      <div className="page-shell state-page">
-        <Result
-          status="error"
-          title="报告读取失败"
-          subTitle={error}
-          extra={[
-            <Button key="submit" onClick={() => navigate('/submit')} type="primary">重新提交资料</Button>,
-            <Button key="home" onClick={() => navigate('/')}>返回数据概览</Button>,
-          ]}
-        />
-      </div>
+      <Result
+        status="error"
+        title="审查失败"
+        subTitle={error}
+        extra={
+          <Button type="primary" onClick={() => navigate('/submit')}>
+            重新提交
+          </Button>
+        }
+      />
     )
   }
 
   if (loading && !result) {
     return (
-      <div className="page-shell report-page">
-        <header className="page-header">
-          <Text className="page-kicker">正在准备证据链</Text>
-          <Title className="page-title">商标合规审查报告</Title>
-        </header>
-        <Card className="surface-card"><Skeleton active paragraph={{ rows: 10 }} /></Card>
-      </div>
+      <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+        <Title level={2} style={{ margin: 0 }}>
+          商标合规审查报告
+        </Title>
+        <Card>
+          <Skeleton active paragraph={{ rows: 8 }} />
+        </Card>
+      </Space>
     )
   }
 
-  if (!result) return <Empty description="暂无审查结果" />
+  if (!result) {
+    return <Empty description="暂无审查结果" />
+  }
 
   if (result.status !== 'done') {
     return (
-      <div className="page-shell state-page">
-        <Card className="surface-card pending-report-card">
-          <Title level={2}>报告仍在生成</Title>
-          <Progress percent={result.progress} strokeColor="#006a6a" />
-          <Paragraph>页面正在自动读取后端结果，你也可以返回进度页继续查看。</Paragraph>
-          <Button onClick={() => navigate(`/reviewing?taskId=${encodeURIComponent(result.taskId)}`)}>
-            返回审查进度
-          </Button>
-        </Card>
-      </div>
+      <Card style={{ margin: '64px auto', maxWidth: 620 }}>
+        <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+          <Title level={2} style={{ margin: 0 }}>
+            AI 合规审查中...
+          </Title>
+          <Progress percent={result.progress} />
+          <Steps current={result.currentStep} direction="vertical" items={reviewSteps} />
+          <Paragraph type="secondary" style={{ margin: 0 }}>
+            正在获取后端审查结果，页面将每 2 秒自动刷新一次。
+          </Paragraph>
+        </Space>
+      </Card>
     )
   }
 
   const { absolute, advice, relative, visual } = result
-  const reportDownloadUrl = advice.documentDownloadUrl
+  const { registrationStrategy } = result
 
-  const rulesPanel = (
-    <div className="report-panel-stack">
-      <Card className="surface-card rejection-card">
-        <div>
-          <Text className="report-card-kicker"><SafetyCertificateOutlined /> 绝对理由评估</Text>
-          <Title level={3}>{absolute.hasRisk ? '存在绝对驳回风险' : '未发现绝对驳回风险'}</Title>
-          <Paragraph>
-            该概率由当前规则命中与图形分析结果综合计算，不代表主管机关最终决定。
-          </Paragraph>
-        </div>
-        <Progress
-          aria-label={`绝对驳回概率 ${absolute.rejectionProbability}%`}
-          percent={absolute.rejectionProbability}
-          strokeColor={absolute.hasRisk ? '#994712' : '#2f7d32'}
-          type="dashboard"
-        />
-      </Card>
+  const intelligentPrecheckTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
       <HitRuleList hitRules={result.hitRules} />
-    </div>
-  )
-
-  const conflictPanel = (
-    <div className="report-panel-stack">
-      <Alert
-        description={relative.hasRisk ? '请重点核对下列在先商标、注册类别和相似类型。' : '当前数据集中没有发现需要展示的冲突商标。'}
-        message={relative.hasRisk ? '检出相对理由冲突' : '未检出明显冲突'}
-        showIcon
-        type={relative.hasRisk ? 'error' : 'success'}
-      />
-      {relative.conflicts.length > 0 ? (
-        <div className="conflict-grid">
-          {relative.conflicts.map((conflict) => (
-            <Card className="surface-card conflict-card" key={conflict.registrationNo || conflict.brandName}>
-              <div className="conflict-card-header">
-                <Title level={4}>{conflict.brandName}</Title>
-                <Tag color={conflict.similarityScore >= 80 ? 'red' : 'orange'}>
-                  相似度 {conflict.similarityScore}%
-                </Tag>
-              </div>
-              <dl className="evidence-list">
-                <div><dt>注册类别</dt><dd>{conflict.registeredClass || '未提供'}</dd></div>
-                <div><dt>注册号</dt><dd>{conflict.registrationNo || '未提供'}</dd></div>
-                <div><dt>相似类型</dt><dd>{conflict.similarityType || '综合相似'}</dd></div>
-              </dl>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Empty description="暂无冲突商标" />
-      )}
-      {relative.precedents.length > 0 && (
-        <div>
-          <Title level={3}>相关判例线索</Title>
-          <div className="precedent-grid">
-            {relative.precedents.map((precedent) => (
-              <Card className="surface-card" key={`${precedent.caseName}-${precedent.date}`}>
-                <Title level={4}>{precedent.caseName}</Title>
-                <Text>{precedent.court} {precedent.date}</Text>
-                <Paragraph>{precedent.ruling}</Paragraph>
-                <Alert message={precedent.relevance} showIcon type="info" />
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-
-  const referencePanel = (
-    <Card className="surface-card" title={<span><FileTextOutlined /> 法律与数据依据</span>}>
-      <LegalReferenceCollapse references={result.references} />
-    </Card>
-  )
-
-  const visualPanel = (
-    <div className="visual-report-grid">
-      <Card className="surface-card" title={<span><PictureOutlined /> 视觉特征雷达</span>}>
-        {visual.radarData.length > 0 ? (
-          <>
-            <div
-              className="radar-chart-wrap"
-              role="img"
-              aria-label="上传商标与对标品牌在各视觉维度的雷达图比较"
-            >
-              <ResponsiveContainer height={320} width="100%">
+      <Row gutter={[24, 24]}>
+        <Col xs={24} lg={10}>
+          <Card title="绝对驳回概率" style={{ height: '100%' }}>
+            <div style={{ paddingTop: 24, textAlign: 'center' }}>
+              <Progress
+                type="dashboard"
+                percent={absolute.rejectionProbability}
+                strokeColor={absolute.hasRisk ? '#faad14' : '#52c41a'}
+                format={(percent) => `${percent}%`}
+              />
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} lg={14}>
+          <Card title="OpenCV 视觉特征雷达">
+            {visual.radarData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
                 <RadarChart data={visual.radarData} outerRadius="68%">
                   <PolarGrid />
                   <PolarAngleAxis dataKey="dimension" />
-                  <Radar dataKey="target" name="上传商标" stroke="#006a6a" fill="#13c2c2" fillOpacity={0.25} isAnimationActive={false} />
-                  <Radar dataKey="benchmark" name="对标品牌" stroke="#ba1a1a" fill="#ba1a1a" fillOpacity={0.16} isAnimationActive={false} />
+                  <Radar
+                    dataKey="target"
+                    name="上传商标"
+                    stroke="#1677ff"
+                    fill="#1677ff"
+                    fillOpacity={0.3}
+                    isAnimationActive={false}
+                  />
+                  <Radar
+                    dataKey="benchmark"
+                    name="风险基准"
+                    stroke="#ff4d4f"
+                    fill="#ff4d4f"
+                    fillOpacity={0.2}
+                    isAnimationActive={false}
+                  />
                   <Legend />
                 </RadarChart>
               </ResponsiveContainer>
-            </div>
-            <Paragraph className="chart-summary">
-              图表用于展示各维度的相对差异，具体风险仍以规则命中、冲突记录和报告结论为准。
-            </Paragraph>
-          </>
+            ) : (
+              <Empty description="暂无视觉分析数据" />
+            )}
+          </Card>
+        </Col>
+      </Row>
+    </Space>
+  )
+
+  const relativeTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Alert
+        message={relative.hasRisk ? '检出跨类目冲突' : '未检出冲突'}
+        type={relative.hasRisk ? 'error' : 'success'}
+        showIcon
+      />
+      <Card title="冲突品牌比对">
+        {relative.conflicts.length > 0 ? (
+          <Table<Conflict>
+            columns={conflictColumns}
+            dataSource={relative.conflicts}
+            pagination={false}
+            rowKey={(record) => record.registrationNo || record.brandName}
+            scroll={{ x: 900 }}
+          />
         ) : (
-          <Empty description="暂无视觉分析数据" />
+          <Empty description="暂无冲突品牌" />
         )}
       </Card>
-      <Card className="surface-card" title="相似品牌对标">
-        {visual.matchedBrands.length > 0 ? (
+      {relative.precedents.length > 0 ? (
+        relative.precedents.map((precedent) => (
+          <Card key={`${precedent.caseName}-${precedent.date}`} title={<Title level={5}>{precedent.caseName}</Title>}>
+            <Paragraph type="secondary">
+              {precedent.court} · {precedent.date}
+            </Paragraph>
+            <Paragraph>判决摘要：{precedent.ruling}</Paragraph>
+            <Alert message={`关联性说明：${precedent.relevance}`} type="error" />
+          </Card>
+        ))
+      ) : (
+        <Empty description="暂无判例依据" />
+      )}
+    </Space>
+  )
+
+  const culturalRiskTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Alert
+        message="越南硬规则与文化禁忌审查"
+        description="当前阶段优先覆盖纯中文/非常用文字、公共标志、显著性不足、误导性描述等越南商标审查硬规则；东盟多国禁忌表将在后续扩展。"
+        type="warning"
+        showIcon
+      />
+      <Card title="硬规则命中">
+        <HitRuleList hitRules={result.hitRules.filter((rule) => rule.ruleType === 'absolute')} />
+      </Card>
+      <Card title="法律依据">
+        <LegalReferenceCollapse references={result.references} />
+      </Card>
+    </Space>
+  )
+
+  const registrationStrategyTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Alert
+        message={`推荐路径：${registrationStrategy.recommendedPath || '待生成'}`}
+        description={registrationStrategy.reason || '暂无注册策略结果'}
+        type="info"
+        showIcon
+      />
+      <Card title="策略摘要">
+        <Row gutter={[16, 16]}>
+          <Col xs={24} md={8}>
+            <StatisticLike title="目标市场" value={registrationStrategy.targetMarkets.join('、') || '未填写'} />
+          </Col>
+          <Col xs={24} md={8}>
+            <StatisticLike
+              title="中国基础"
+              value={registrationStrategy.hasChinaBase ? '已有注册/申请' : '暂无或不确定'}
+            />
+          </Col>
+          <Col xs={24} md={8}>
+            <StatisticLike title="成本提示" value={registrationStrategy.costSaving || '待评估'} />
+          </Col>
+        </Row>
+      </Card>
+      <Row gutter={[16, 16]}>
+        {registrationStrategy.costComparison.map((item) => (
+          <Col key={item.option} xs={24} md={8}>
+            <Card title={item.option} style={{ height: '100%' }}>
+              <Space direction="vertical" size={8} style={{ display: 'flex' }}>
+                <Tag color={isRecommendedOption(item.option, registrationStrategy.recommendedPath) ? 'green' : 'blue'}>
+                  {isRecommendedOption(item.option, registrationStrategy.recommendedPath) ? '推荐路径' : item.costLevel}
+                </Tag>
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  速度：{item.speed}
+                </Paragraph>
+                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                  适用：{item.suitableFor}
+                </Paragraph>
+                <Paragraph style={{ marginBottom: 0 }}>{item.note}</Paragraph>
+              </Space>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={12}>
+          <Card title="推进时间轴">
+            <Steps
+              direction="vertical"
+              items={registrationStrategy.timeline.map((item) => ({
+                title: `${item.stage} · ${item.duration}`,
+                description: item.action,
+              }))}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card title="商品/服务本地化改写">
+            <List
+              dataSource={registrationStrategy.localizedGoodsServices}
+              locale={{ emptyText: '暂无本地化建议' }}
+              renderItem={(item) => (
+                <List.Item>
+                  <Space direction="vertical" size={6} style={{ display: 'flex' }}>
+                    <Tag color={item.market === '越南' ? 'red' : 'blue'}>{item.market}</Tag>
+                    <Text strong>{item.localized}</Text>
+                    <Text type="secondary">{item.note}</Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
+      <Card title="策略风险提示">
+        {registrationStrategy.risks.length > 0 ? (
           <List
-            dataSource={visual.matchedBrands}
-            renderItem={(brand) => (
+            dataSource={registrationStrategy.risks}
+            renderItem={(risk) => (
               <List.Item>
-                <div className="matched-brand-row">
-                  <Image alt={`${brand.name} 商标缩略图`} preview={false} src={brand.thumbnailUrl} width={88} />
-                  <div>
-                    <Text strong>{brand.name}</Text>
-                    <Progress percent={brand.matchScore} size="small" strokeColor={brand.matchScore >= 80 ? '#ba1a1a' : '#994712'} />
-                  </div>
-                </div>
+                <Alert message={risk} type="warning" showIcon style={{ width: '100%' }} />
               </List.Item>
             )}
           />
         ) : (
-          <Empty description="暂无匹配品牌" />
+          <Empty description="暂无策略风险提示" />
         )}
       </Card>
-    </div>
+    </Space>
   )
 
-  const advicePanel = (
-    <div className="report-panel-stack">
-      <div className="recommendation-grid">
-        {advice.recommendations.map((recommendation) => {
-          const config = priorityConfig[recommendation.priority]
-          return (
-            <Card className="surface-card recommendation-card" key={`${recommendation.priority}-${recommendation.title}`}>
-              <Tag color={config.color}>{recommendation.priority} {config.label}</Tag>
-              <Title level={4}>{recommendation.title}</Title>
-              <Paragraph>{recommendation.description}</Paragraph>
-            </Card>
-          )
-        })}
-      </div>
-      <Card className="surface-card document-preview-card" title="防御性合规规划书预览">
-        {advice.documentPreview ? (
-          advice.documentPreview.split('\n\n').map((paragraph) => (
-            <Paragraph key={paragraph}>{paragraph}</Paragraph>
-          ))
+  const monitoringPlaceholderTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Alert
+        message="风控与维权监测"
+        description="围绕公告监控、法规预警和反向风险建立持续跟踪入口，便于企业在申请后继续管理商标风险。"
+        type="warning"
+        showIcon
+      />
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card title="抢注预警">
+            <Paragraph type="secondary">未来接入 NOIP 周公告 PDF/OCR，监控近似新申请和 5 个月异议窗口。</Paragraph>
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card title="法规预警">
+            <Paragraph type="secondary">未来抓取主管机关公告并由模型摘要标签化，提示对申请/异议/维权的影响。</Paragraph>
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card title="反向风险">
+            <Paragraph type="secondary">未来定期跑全库 Top-K，提示他人相似标对我方经营造成的潜在威胁。</Paragraph>
+          </Card>
+        </Col>
+      </Row>
+    </Space>
+  )
+
+  const documentGenerationTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Card title="处置建议清单">
+        {advice.recommendations.length > 0 ? (
+          <List
+            dataSource={advice.recommendations}
+            renderItem={(recommendation) => (
+              <List.Item>
+                <Space align="start" size={12}>
+                  <Tag color={priorityColor[recommendation.priority]}>{recommendation.priority}</Tag>
+                  <div>
+                    <Text strong>{recommendation.title}</Text>
+                    <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+                      {recommendation.description}
+                    </Paragraph>
+                  </div>
+                </Space>
+              </List.Item>
+            )}
+          />
         ) : (
-          <Empty description="暂无文书预览" />
+          <Empty description="暂无建议" />
         )}
       </Card>
-    </div>
+      <Card
+        title="文书生成说明"
+        extra={<Tag color="blue">Markdown 可下载</Tag>}
+      >
+        <Paragraph type="secondary" style={{ margin: 0 }}>
+          当前阶段生成防御性合规规划书 Markdown 预览，适合复制到飞书或作为 PDF 模板的数据源。正式 PDF 下载将在后续部署/模板阶段处理。
+        </Paragraph>
+      </Card>
+      <DocumentPreviewCard brandName={result.brandName} content={advice.documentPreview} />
+    </Space>
   )
 
   return (
-    <div className="page-shell report-page">
-      <header className="page-header report-header">
-        <div className="page-header-row">
-          <div>
-            <Text className="page-kicker">报告 ID {result.taskId.slice(0, 8)}</Text>
-            <Title className="page-title">商标合规审查报告</Title>
-            <Paragraph className="page-description">
-              报告将风险结论与规则、冲突商标、视觉特征和来源证据关联展示。
-            </Paragraph>
-          </div>
-          <div className="page-header-actions">
-            <Button
-              disabled={!reportDownloadUrl}
-              icon={<DownloadOutlined />}
-              onClick={() => reportDownloadUrl && window.open(reportDownloadUrl, '_blank', 'noopener,noreferrer')}
-              size="large"
-              type="primary"
-            >
-              下载 PDF 报告
-            </Button>
-          </div>
-        </div>
-      </header>
-
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Title level={2} style={{ margin: 0 }}>
+        商标合规审查报告
+      </Title>
       <RiskSummaryCard data={result} />
-
-      {result.manualReviewRequired && (
-        <Alert
-          className="manual-review-alert"
-          description="建议在正式申请前由商标代理人核对冲突记录、实际使用范围和主管机关最新审查口径。"
-          icon={<WarningOutlined />}
-          message="本报告需要人工复核"
-          showIcon
-          type="warning"
-        />
-      )}
-
+      <ReportActionPanel result={result} />
+      <Card title="6 大模块执行总览">
+        <ComplianceModuleGrid result={result} />
+      </Card>
       <Tabs
-        className="report-tabs"
-        destroyOnHidden={false}
         items={[
-          { key: 'rules', label: '规则命中', children: rulesPanel },
-          { key: 'conflicts', label: '冲突证据', children: conflictPanel },
-          { key: 'references', label: '法律依据', children: referencePanel },
-          { key: 'visual', label: '视觉分析', children: visualPanel },
-          { key: 'advice', label: '改进建议', children: advicePanel },
+          { key: 'm1', label: 'M1 智能预检', children: intelligentPrecheckTab },
+          { key: 'm2', label: 'M2 侵权检索', children: relativeTab },
+          { key: 'm3', label: 'M3 文化禁忌', children: culturalRiskTab },
+          { key: 'm4', label: 'M4 注册策略', children: registrationStrategyTab },
+          { key: 'm5', label: 'M5 风控与维权', children: monitoringPlaceholderTab },
+          { key: 'm6', label: 'M6 文书生成', children: documentGenerationTab },
         ]}
       />
-    </div>
+    </Space>
   )
 }
 

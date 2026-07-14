@@ -4,6 +4,8 @@ export interface AuditRequest {
   niceClass: string
   goodsServices: string
   businessDescription?: string
+  targetMarkets: string[]
+  hasChinaBase: boolean
   logo: string
 }
 
@@ -23,6 +25,8 @@ export interface AuditResponse {
 }
 
 export interface HitRule {
+  ruleId?: string
+  ruleName?: string
   ruleType: 'absolute' | 'relative'
   article: string
   content: string
@@ -111,6 +115,32 @@ export interface AuditResult {
     }>
     documentPreview: string
     documentDownloadUrl?: string
+  }
+  registrationStrategy: {
+    targetMarkets: string[]
+    hasChinaBase: boolean
+    recommendedPath: string
+    reason: string
+    costSaving: string
+    costComparison: Array<{
+      option: string
+      costLevel: string
+      speed: string
+      suitableFor: string
+      note: string
+    }>
+    timeline: Array<{
+      stage: string
+      duration: string
+      action: string
+    }>
+    localizedGoodsServices: Array<{
+      market: string
+      original: string
+      localized: string
+      note: string
+    }>
+    risks: string[]
   }
 }
 

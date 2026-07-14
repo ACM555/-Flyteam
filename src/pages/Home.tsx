@@ -2,177 +2,245 @@ import {
   ArrowRightOutlined,
   FileProtectOutlined,
   FileTextOutlined,
-  ReloadOutlined,
   SafetyCertificateOutlined,
+  SolutionOutlined,
   WarningOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Card, Skeleton, Typography } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import { Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getStatistics } from '@/api'
+import ComplianceModuleGrid from '@/components/ComplianceModuleGrid'
 import type { StatisticsData } from '@/types/audit'
 
 const { Paragraph, Text, Title } = Typography
 
 const capabilities = [
   {
-    title: '法条级风险筛查',
-    description: '围绕越南商标注册规则识别绝对驳回与相对驳回风险，并保留命中条款与审查说明。',
+    title: '商标合规扫描',
+    description: '围绕越南商标注册审查规则，快速识别绝对驳回与相对驳回风险。',
+    hint: '适合提交前快速体检',
     icon: <SafetyCertificateOutlined />,
-    featured: true,
+    color: '#1677ff',
+    background: '#f0f5ff',
   },
   {
-    title: '图形特征分析',
-    description: '通过本地 OpenCV 提取形状、结构与对称性特征，辅助识别高风险图形表达。',
+    title: '法律风险预警',
+    description: '结合本地规则库、冲突品牌库和判例线索，提前发现跨类攀附风险。',
+    hint: '适合出海品牌风控评估',
     icon: <FileProtectOutlined />,
+    color: '#faad14',
+    background: '#fffbe6',
   },
   {
-    title: '证据链报告',
-    description: '把规则、冲突商标、判例线索和改进建议汇总为可下载的合规规划书。',
-    icon: <FileTextOutlined />,
+    title: '防御文书生成',
+    description: '把审查结论沉淀为合规建议和防御性规划书，辅助团队后续应对。',
+    hint: '适合法务与业务同步决策',
+    icon: <SolutionOutlined />,
+    color: '#52c41a',
+    background: '#f6ffed',
   },
 ]
 
 function Home() {
   const navigate = useNavigate()
-  const [statistics, setStatistics] = useState<StatisticsData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+  const [statisticsData, setStatisticsData] = useState<StatisticsData>({
+    auditedBrands: 0,
+    highRiskBlocked: 0,
+  })
 
-  const loadStatistics = useCallback(async () => {
-    setLoading(true)
-    setError('')
+  useEffect(() => {
+    let ignore = false
 
-    try {
-      setStatistics(await getStatistics())
-    } catch {
-      setError('统计数据暂时无法读取，请确认后端服务已启动。')
-    } finally {
-      setLoading(false)
+    getStatistics()
+      .then((data) => {
+        if (!ignore) setStatisticsData(data)
+      })
+      .catch(() => {
+        if (!ignore) setStatisticsData({ auditedBrands: 0, highRiskBlocked: 0 })
+      })
+
+    return () => {
+      ignore = true
     }
   }, [])
 
-  useEffect(() => {
-    loadStatistics()
-  }, [loadStatistics])
+  const statistics = useMemo(
+    () => [
+      {
+        title: '已审查品牌',
+        value: statisticsData.auditedBrands,
+        suffix: '个',
+        color: '#1677ff',
+        icon: <SafetyCertificateOutlined />,
+      },
+      {
+        title: '拦截高风险',
+        value: statisticsData.highRiskBlocked,
+        suffix: '项',
+        color: '#ff4d4f',
+        icon: <WarningOutlined />,
+      },
+      {
+        title: '法条覆盖',
+        value: 5,
+        suffix: '类',
+        color: '#52c41a',
+        icon: <FileTextOutlined />,
+      },
+    ],
+    [statisticsData],
+  )
 
   return (
-    <div className="page-shell home-page">
-      <header className="page-header home-header">
-        <div className="page-header-row">
-          <div>
-            <Text className="page-kicker">越南商标注册预审工作台</Text>
-            <Title className="page-title">出海之前，先把商标风险说清楚</Title>
-            <Paragraph className="page-description">
-              Outbound-Guard 将公开商标数据、越南法律规则与图形分析结果整理为可追溯的风险报告，帮助企业在正式申请前发现冲突并调整方案。
-            </Paragraph>
-          </div>
-          <div className="page-header-actions">
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <div
+        style={{
+          background:
+            'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.28) 0, rgba(255,255,255,0) 30%), linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)',
+          borderRadius: 16,
+          boxShadow: '0 16px 40px rgba(22, 119, 255, 0.22)',
+          color: '#fff',
+          overflow: 'hidden',
+          padding: '48px 40px',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.14)',
+            borderRadius: 999,
+            height: 180,
+            position: 'absolute',
+            right: -56,
+            top: -72,
+            width: 180,
+          }}
+        />
+        <div style={{ maxWidth: 720, position: 'relative', zIndex: 1 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+            越南出海商标合规智能体
+          </Text>
+          <Title level={1} style={{ color: '#fff', margin: '10px 0 12px' }}>
+            Outbound-Guard
+          </Title>
+          <Paragraph
+            style={{
+              color: 'rgba(255,255,255,0.88)',
+              fontSize: 16,
+              lineHeight: 1.8,
+              marginBottom: 28,
+              maxWidth: 620,
+            }}
+          >
+            零幻觉法条级审查，秒级识别跨类攀附风险。为中国企业出海东南亚提供商标提交前的智能扫描、风险预警与合规建议。
+          </Paragraph>
+          <Space size={12} wrap>
             <Button
+              ghost
               icon={<ArrowRightOutlined />}
               onClick={() => navigate('/submit')}
               size="large"
+              style={{ borderColor: '#fff', color: '#fff' }}
               type="primary"
             >
-              开始商标审查
+              立即开始审查
             </Button>
-          </div>
+            <Text style={{ color: 'rgba(255,255,255,0.76)' }}>预计 3-5 秒生成初步报告</Text>
+          </Space>
         </div>
-      </header>
+      </div>
 
-      {error && (
-        <Alert
-          action={<Button icon={<ReloadOutlined />} onClick={loadStatistics}>重试</Button>}
-          className="home-data-alert"
-          message={error}
-          showIcon
-          type="warning"
-        />
-      )}
-
-      <section aria-labelledby="overview-title">
-        <div className="section-heading-row">
-          <div>
-            <Title className="section-title" id="overview-title" level={2}>
-              审查数据概览
-            </Title>
-            <Paragraph className="section-description">
-              以下数据来自当前系统任务数据库，不使用演示数字。
-            </Paragraph>
-          </div>
-          <Text className="live-status"><span aria-hidden="true" />系统服务数据</Text>
-        </div>
-
-        <div className="metric-grid">
-          <Card className="surface-card metric-card">
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 1 }} title={false} />
-            ) : (
-              <>
-                <div className="metric-label"><SafetyCertificateOutlined /> 已完成审查</div>
-                <div className="metric-value">{statistics?.auditedBrands.toLocaleString('zh-CN') ?? '0'}</div>
-                <Text className="metric-note">已生成风险结论的商标任务</Text>
-              </>
-            )}
-          </Card>
-          <Card className="surface-card metric-card metric-card--risk">
-            {loading ? (
-              <Skeleton active paragraph={{ rows: 1 }} title={false} />
-            ) : (
-              <>
-                <div className="metric-label"><WarningOutlined /> 高风险拦截</div>
-                <div className="metric-value">{statistics?.highRiskBlocked.toLocaleString('zh-CN') ?? '0'}</div>
-                <Text className="metric-note">建议正式申请前进行人工复核</Text>
-              </>
-            )}
-          </Card>
-        </div>
-      </section>
-
-      <section className="home-section" aria-labelledby="capabilities-title">
-        <Title className="section-title" id="capabilities-title" level={2}>
-          审查能力
-        </Title>
-        <Paragraph className="section-description">
-          从信息提交到 PDF 报告，所有模块围绕真实业务数据工作。
-        </Paragraph>
-        <div className="capability-grid">
-          {capabilities.map((capability) => (
-            <Card
-              className={`surface-card capability-card${capability.featured ? ' capability-card--featured' : ''}`}
-              key={capability.title}
-            >
-              <div className="capability-icon" aria-hidden="true">{capability.icon}</div>
-              <Title level={3}>{capability.title}</Title>
-              <Paragraph>{capability.description}</Paragraph>
-              {capability.featured && (
-                <Button onClick={() => navigate('/submit')} type="link">
-                  填写资料并开始分析 <ArrowRightOutlined />
-                </Button>
-              )}
+      <Row gutter={[16, 16]}>
+        {statistics.map((item) => (
+          <Col key={item.title} xs={24} sm={8}>
+            <Card>
+              <Statistic
+                prefix={<span style={{ color: item.color }}>{item.icon}</span>}
+                suffix={item.suffix}
+                title={item.title}
+                value={item.value}
+                valueStyle={{ color: item.color, fontWeight: 700 }}
+              />
             </Card>
-          ))}
-        </div>
-      </section>
+          </Col>
+        ))}
+      </Row>
+      <Text type="secondary">以下数据来自当前系统任务数据库，不使用演示数字。</Text>
 
-      <section className="methodology-panel" aria-labelledby="methodology-title">
-        <Title id="methodology-title" level={2}>方法与边界</Title>
-        <div className="methodology-grid">
-          <div>
-            <Text strong>数据来源</Text>
-            <Paragraph>
-              系统使用项目内维护的越南公开商标条目、权利人信息和法律规则库，并支持按公开列表更新数据。
-            </Paragraph>
-          </div>
-          <div>
-            <Text strong>结论边界</Text>
-            <Paragraph>
-              报告属于计算风险评估，不构成正式法律意见，也不能替代越南主管机关的最终审查结果。
-            </Paragraph>
-          </div>
-        </div>
-      </section>
-    </div>
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          6 大功能模块
+        </Title>
+        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          围绕提交前预检、侵权线索、文化禁忌、注册策略、风控维权与文书生成组织完整产品路径。
+        </Paragraph>
+        <ComplianceModuleGrid />
+      </div>
+
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          核心能力
+        </Title>
+        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          从提交、审查到报告输出，覆盖出海商标合规评估的关键节点。
+        </Paragraph>
+        <Row gutter={[20, 20]}>
+          {capabilities.map((capability) => {
+            const isHovered = hoveredCard === capability.title
+
+            return (
+              <Col key={capability.title} xs={24} md={12} lg={8}>
+                <Card
+                  hoverable
+                  onClick={() => navigate('/submit')}
+                  onMouseEnter={() => setHoveredCard(capability.title)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{
+                    boxShadow: isHovered ? '0 10px 28px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
+                    cursor: 'pointer',
+                    height: '100%',
+                    minHeight: 238,
+                    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: capability.background,
+                        borderRadius: 12,
+                        color: capability.color,
+                        display: 'flex',
+                        fontSize: 28,
+                        height: 56,
+                        justifyContent: 'center',
+                        width: 56,
+                      }}
+                    >
+                      {capability.icon}
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {capability.title}
+                    </Title>
+                    <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                      {capability.description}
+                    </Paragraph>
+                    <Text type="secondary">{capability.hint}</Text>
+                  </Space>
+                </Card>
+              </Col>
+            )
+          })}
+        </Row>
+      </div>
+
+      <div style={{ padding: '40px 0 20px', textAlign: 'center' }}>
+        <Text type="secondary">Outbound-Guard v1.0.0 · 越南出海商标合规智能体</Text>
+      </div>
+    </Space>
   )
 }
 
