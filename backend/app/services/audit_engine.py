@@ -483,6 +483,338 @@ def _build_document_preview(
 """
 
 
+def _value_or_pending(value: Any) -> str:
+    text = str(value or "").strip()
+    return text or "待补充"
+
+
+def _target_country(req: dict[str, Any]) -> str:
+    markets = req.get("targetMarkets") or ["越南"]
+    if isinstance(markets, list) and markets:
+        return str(markets[0] or "越南")
+    return "越南"
+
+
+def _localized_name(req: dict[str, Any]) -> str:
+    english_name = str(req.get("englishName") or "").strip()
+    brand_name = str(req.get("brandName") or "").strip()
+    return english_name or brand_name or "待补充"
+
+
+def _build_application_document(req: dict[str, Any], hit_rules: list[dict[str, Any]]) -> str:
+    """Build Document 01 from the uploaded DOCX template: trademark application form."""
+
+    brand_name = _value_or_pending(req.get("brandName"))
+    english_name = _value_or_pending(req.get("englishName"))
+    localized_name = _localized_name(req)
+    nice_class = _value_or_pending(req.get("niceClass"))
+    goods_services = _value_or_pending(req.get("goodsServices") or req.get("businessDescription"))
+    logo_description = _build_graphic_description(hit_rules)
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return f"""# Document 01
+# 商标注册申请书
+## Trademark Application Form
+### Đơn đăng ký nhãn hiệu
+
+---
+
+## AI Metadata（文书生成信息）
+
+| 项目 | 内容 |
+|------|------|
+| Document ID | AUTO-{datetime.now().strftime("%Y%m%d%H%M%S")}-APP |
+| AI Engine | GPT + RAG + Rule Engine |
+| Rule Version | Vietnam Rule Set v2025.1 |
+| Document Version | M6 v2.0 |
+| Target Country | {_target_country(req)} |
+| Output Language | 中文 / English / Vietnamese |
+| Generate Time | {generated_at} |
+| Related Risk Report | 自动关联当前审查任务 |
+
+---
+
+## 一、申请人信息（Applicant Information）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 企业名称 | Company Name | 待补充 |
+| 企业英文名称 | English Name | 待补充 |
+| 企业注册地址 | Registered Address | 待补充 |
+| 联系电话 | Phone | 待补充 |
+| Email | Email | 待补充 |
+| 官网 | Website | 待补充 |
+| 企业注册号 | Registration Number | 待补充 |
+
+---
+
+## 二、商标信息（Trademark Information）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 商标名称 | Trademark | {brand_name} |
+| 商标英文 | English Trademark | {english_name} |
+| 本地化名称 | Localized Trademark | {localized_name} |
+| 商标类型 | Trademark Type | 文字 + 图形 / Word + Device |
+| Nice分类 | Nice Classification | {nice_class} |
+
+---
+
+## 三、Logo 信息（Logo Information）
+
+### Logo
+
+【AI自动关联用户上传 Logo，正式提交前请替换为 NOIP 接受的清晰图样文件】
+
+---
+
+### Logo Description
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| {logo_description} | AI visual description pending legal review. | Mô tả logo cần đại diện sở hữu trí tuệ Việt Nam rà soát. |
+
+---
+
+## 四、商品/服务
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 商品描述 | Goods | {goods_services} |
+| 服务描述 | Services | {goods_services} |
+
+---
+
+## 五、申请声明（Applicant Declaration）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 本申请信息真实有效。 | The information provided is true and accurate. | Thông tin trong đơn là trung thực và chính xác. |
+| 本申请人拥有合法商标权利。 | Applicant declares lawful ownership. | Người nộp đơn tuyên bố có quyền hợp pháp đối với nhãn hiệu. |
+
+---
+
+## 六、Applicant Signature
+
+```text
+Applicant Signature
+
+_________________________
+
+Date
+
+_________________________
+
+Company Seal
+
+_________________________
+```
+
+---
+
+# AI 自动填充来源
+
+✅ 企业档案（当前未填写部分保留为“待补充”）  
+✅ Logo识别  
+✅ 品牌名称  
+✅ AI三语本地化  
+✅ 国家规则库
+"""
+
+
+def _build_power_of_attorney_document(req: dict[str, Any]) -> str:
+    """Build Document 02 from the uploaded DOCX template: trademark agent POA."""
+
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return f"""# Document 02
+# 商标代理委托书
+## Power of Attorney
+### Giấy ủy quyền
+
+---
+
+## AI Metadata（文书生成信息）
+
+| 项目 | 内容 |
+|------|------|
+| Document ID | AUTO-{datetime.now().strftime("%Y%m%d%H%M%S")}-POA |
+| AI Engine | GPT + RAG + Rule Engine |
+| Rule Version | Vietnam Rule Set v2025.1 |
+| Document Version | M6 v2.0 |
+| Target Country | {_target_country(req)} |
+| Output Language | 中文 / English / Vietnamese |
+| Generate Time | {generated_at} |
+| Related Risk Report | 自动关联当前审查任务 |
+
+---
+
+## 一、委托人（Applicant）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 企业名称 | Applicant | 待补充 |
+| 地址 | Address | 待补充 |
+| 法定代表人 | Legal Representative | 待补充 |
+
+---
+
+## 二、代理机构（Trademark Agent）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 代理机构 | Trademark Agent | 待补充 |
+| 联系方式 | Contact | 待补充 |
+| 地址 | Address | 待补充 |
+
+---
+
+## 三、授权事项（Authorization Scope）
+
+☑ 提交商标申请  
+☑ Respond to Office Action  
+☑ 修改申请  
+☑ 官方缴费  
+☑ 领取注册证书  
+☑ 提交异议  
+☑ 提交复审  
+☑ 商标续展
+
+---
+
+## 四、授权声明（Authorization Statement）
+
+| 中文 | English | 目标国家语言 |
+|------|----------|-------------|
+| 本人授权上述代理机构办理目标国家商标注册事项。 | Applicant authorizes the above representative to act on its behalf. | Người nộp đơn ủy quyền cho đại diện nêu trên thực hiện thủ tục đăng ký nhãn hiệu tại quốc gia mục tiêu. |
+
+---
+
+## 五、Applicant Signature
+
+```text
+Applicant Signature
+
+_________________________
+
+Date
+
+_________________________
+
+Company Seal
+
+_________________________
+```
+
+---
+
+### AI 自动生成依据
+
+- 企业档案
+- 国家代理规则
+- 国家授权模板
+- 国家法律术语库
+
+> 注：本委托书为模板化草案，正式提交前应由越南本地代理机构确认签章、认证、公证及语言版本要求。
+"""
+
+    return f"""# 📋 越南商标注册合规预检报告
+**生成时间**：{generated_at}  
+**风险评级**：✅ **低风险**
+
+## 1. 基本信息
+- **审查品牌**：{brand_name}
+- **注册类别**：{nice_class}
+- **图形描述**：{graphic_description}
+- **商品/服务描述**：{goods_services}
+
+## 2. 风险等级
+✅ **低风险**
+
+**结论**：该商标可进入越南知识产权局注册准备流程。
+
+**原因**：{overall} 当前未发现明显的绝对驳回理由或高强度在先冲突线索，综合风险分值为 **{score}/100**。
+
+---
+
+## 3. 发现的问题
+
+✅ **未发现明显违规问题**
+
+该商标在以下方面表现良好：
+- ✅ 具有一定显著性。
+- ✅ 未命中当前规则库中的国家象征或人物肖像类严重风险。
+- ✅ 未发现明显描述性或欺骗性标志风险。
+- ✅ 未发现高强度驰名商标冲突线索。
+
+---
+
+## 4. 法律依据
+
+{legal_basis}
+
+---
+
+## 5. 建议类别
+**✅ A. 可以提交注册**
+
+---
+
+## 6. 行动清单
+
+**准备申请材料**（第1-2周）：
+1. 收集品牌使用证据，例如发票、宣传材料、网站或社交媒体证据。
+2. 确认商标所有人信息，包括企业名称、注册地址和联系方式。
+3. 整理 Logo 文件、类别信息和商品/服务描述。
+
+**近似检索**（第2周）：
+1. 委托越南本地代理机构进行 NOIP 数据库检索。
+2. 确认不存在高度近似商标。
+3. 如发现潜在冲突，准备差异化说明。
+
+**提交申请**（第3周）：
+1. 选择信誉良好的越南 IP 代理机构。
+2. 准备正式申请文件。
+3. 提交至越南知识产权局（NOIP）。
+4. 获取申请号和确认信息。
+
+**后续维护**（申请后）：
+1. 关注 NOIP 审查通知。
+2. 如有驳回通知，及时准备答辩材料。
+3. 最终获得注册证书通常需结合官方审查周期判断。
+
+**费用参考**：
+- 近似检索：¥2,000-3,500
+- 代理申请费：¥1,500-2,500
+- 政府申请费：约¥1,500
+- **总计**：¥5,000-7,500
+
+**推荐时间表**：
+```text
+第1周：准备材料
+第2周：近似检索 + 定稿
+第3周：正式提交
+预期结果时间：通常需 12-18 个月内结合官方流程取得结果
+```
+
+---
+
+## 7. 免责声明
+
+本报告基于现有商标审查规则生成，仅供参考。
+
+- ⚠️ 报告反映的是当前风险评估，实际审查结果由越南知识产权局最终决定。
+- ⚠️ 商标审查涉及多个因素，本报告无法覆盖所有情况。
+- ⚠️ 如果申请过程中商标法或审查口径发生变化，结论可能需要调整。
+
+**建议**：虽然风险评估为低，但仍建议与越南本地 IP 专业人士咨询，确保申请流程顺利。
+
+---
+
+**版本**：1.0
+"""
+
+
 def run_audit(req: dict[str, Any]) -> dict[str, Any]:
     """Run the local three-layer audit pipeline."""
 
@@ -521,5 +853,7 @@ def run_audit(req: dict[str, Any]) -> dict[str, Any]:
         "radarData": vision.get("radarData", []),
         "matchedBrands": vision.get("matchedBrands", []),
         "documentPreview": _build_document_preview(req, risk_level, score, overall, hit_rules, references, suggestions),
+        "applicationDocumentPreview": _build_application_document(req, hit_rules),
+        "powerOfAttorneyPreview": _build_power_of_attorney_document(req),
         "registrationStrategy": registration_strategy,
     }

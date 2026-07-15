@@ -52,6 +52,13 @@ class AuditEngineTest(unittest.TestCase):
         self.assertIn("**风险评级**：🔴 **高风险**", result["documentPreview"])
         self.assertIn("**⛔ C. 强烈不建议提交**", result["documentPreview"])
         self.assertIn("## 7. 免责声明", result["documentPreview"])
+        self.assertIn("# 商标注册申请书", result["applicationDocumentPreview"])
+        self.assertIn("## Trademark Application Form", result["applicationDocumentPreview"])
+        self.assertIn("### Đơn đăng ký nhãn hiệu", result["applicationDocumentPreview"])
+        self.assertIn("星巴克", result["applicationDocumentPreview"])
+        self.assertIn("# 商标代理委托书", result["powerOfAttorneyPreview"])
+        self.assertIn("## Power of Attorney", result["powerOfAttorneyPreview"])
+        self.assertIn("### Giấy ủy quyền", result["powerOfAttorneyPreview"])
 
     def test_complete_unknown_brand_is_low_risk(self):
         logo = make_plain_logo_base64()

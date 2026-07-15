@@ -6,6 +6,9 @@ const { Paragraph, Text } = Typography
 interface DocumentPreviewCardProps {
   brandName: string
   content: string
+  title?: string
+  emptyDescription?: string
+  filenameSuffix?: string
 }
 
 function downloadMarkdown(filename: string, content: string) {
@@ -20,7 +23,13 @@ function downloadMarkdown(filename: string, content: string) {
   URL.revokeObjectURL(url)
 }
 
-function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
+function DocumentPreviewCard({
+  brandName,
+  content,
+  title = 'M6 · 越南商标注册合规预检报告',
+  emptyDescription = '暂无报告预览',
+  filenameSuffix = '越南商标注册合规预检报告',
+}: DocumentPreviewCardProps) {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(content)
@@ -32,12 +41,12 @@ function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
 
   const handleDownload = () => {
     const safeName = brandName.trim() || 'outbound-guard-report'
-    downloadMarkdown(`${safeName}-越南商标注册合规预检报告.md`, content)
+    downloadMarkdown(`${safeName}-${filenameSuffix}.md`, content)
   }
 
   return (
     <Card
-      title="M6 · 越南商标注册合规预检报告"
+      title={title}
       extra={
         <Space>
           <Button disabled={!content} icon={<CopyOutlined />} onClick={handleCopy}>
@@ -82,7 +91,7 @@ function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
           </Text>
         </div>
       ) : (
-        <Empty description="暂无报告预览" />
+        <Empty description={emptyDescription} />
       )}
     </Card>
   )

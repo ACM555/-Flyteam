@@ -140,6 +140,8 @@ class AuditResult(BaseModel):
         description="匹配品牌列表，每项含 name/thumbnailUrl/matchScore",
     )
     documentPreview: str = Field("", description="越南商标注册合规预检报告 Markdown 预览")
+    applicationDocumentPreview: str = Field("", description="商标注册申请书 Markdown 预览")
+    powerOfAttorneyPreview: str = Field("", description="商标代理委托书 Markdown 预览")
     registrationStrategy: RegistrationStrategy = Field(
         default_factory=RegistrationStrategy,
         description="M4 跨域注册策略",

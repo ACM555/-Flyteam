@@ -446,12 +446,54 @@ function Report() {
           <Empty description="暂无建议" />
         )}
       </Card>
-        <Card title="报告生成说明" extra={<Tag color="blue">Markdown 可下载</Tag>}>
-          <Paragraph type="secondary" style={{ margin: 0 }}>
-          当前阶段根据审查风险等级自动选择红/黄/绿三种模板，生成 7 板块《越南商标注册合规预检报告》Markdown 预览，适合复制到飞书或作为 PDF 模板的数据源。
-          </Paragraph>
-        </Card>
-      <DocumentPreviewCard brandName={result.brandName} content={advice.documentPreview} />
+      <Card title="报告生成说明" extra={<Tag color="blue">Markdown 可下载</Tag>}>
+        <Paragraph type="secondary" style={{ margin: 0 }}>
+          当前阶段根据审查结果生成三份 M6 材料：① 红/黄/绿风险模板对应的《越南商标注册合规预检报告》；
+          ② 按上传 Word 模板格式生成的《商标注册申请书》；③ 按上传 Word 模板格式生成的《商标代理委托书》。
+          三份材料均可复制或下载 Markdown，正式提交前应由越南本地代理机构补充申请人、代理机构、签章和认证信息。
+        </Paragraph>
+      </Card>
+      <Tabs
+        items={[
+          {
+            key: 'risk-report',
+            label: '合规预检报告',
+            children: (
+              <DocumentPreviewCard
+                brandName={result.brandName}
+                content={advice.documentPreview}
+                filenameSuffix="越南商标注册合规预检报告"
+              />
+            ),
+          },
+          {
+            key: 'application',
+            label: '商标注册申请书',
+            children: (
+              <DocumentPreviewCard
+                brandName={result.brandName}
+                content={advice.applicationDocumentPreview}
+                title="M6 · 商标注册申请书"
+                emptyDescription="暂无申请书预览"
+                filenameSuffix="商标注册申请书"
+              />
+            ),
+          },
+          {
+            key: 'poa',
+            label: '商标代理委托书',
+            children: (
+              <DocumentPreviewCard
+                brandName={result.brandName}
+                content={advice.powerOfAttorneyPreview}
+                title="M6 · 商标代理委托书"
+                emptyDescription="暂无委托书预览"
+                filenameSuffix="商标代理委托书"
+              />
+            ),
+          },
+        ]}
+      />
     </Space>
   )
 

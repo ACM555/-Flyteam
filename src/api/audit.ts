@@ -55,6 +55,8 @@ type RawAuditResult = Partial<AuditResult> & {
   radarData?: AuditResult['visual']['radarData']
   matchedBrands?: AuditResult['visual']['matchedBrands']
   documentPreview?: string
+  applicationDocumentPreview?: string
+  powerOfAttorneyPreview?: string
   registrationStrategy?: AuditResult['registrationStrategy']
 }
 
@@ -227,6 +229,8 @@ function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResu
         description: suggestion.description ?? '',
       })),
       documentPreview: safeRaw.documentPreview ?? '',
+      applicationDocumentPreview: safeRaw.applicationDocumentPreview ?? '',
+      powerOfAttorneyPreview: safeRaw.powerOfAttorneyPreview ?? '',
     },
     registrationStrategy:
       safeRaw.registrationStrategy ?? buildFallbackRegistrationStrategy(goodsServices, niceClass),

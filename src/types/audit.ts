@@ -114,6 +114,8 @@ export interface AuditResult {
       description: string
     }>
     documentPreview: string
+    applicationDocumentPreview: string
+    powerOfAttorneyPreview: string
     documentDownloadUrl?: string
   }
   registrationStrategy: {

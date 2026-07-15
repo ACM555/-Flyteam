@@ -25,7 +25,13 @@ export function createAuditResult(overrides: Partial<AuditResult> = {}): AuditRe
     absolute: { hasRisk: true, rejectionProbability: 76, articles: [] },
     relative: { hasRisk: true, conflicts: [], precedents: [] },
     visual: { radarData: [], matchedBrands: [] },
-    advice: { recommendations: [], documentPreview: '', documentDownloadUrl: '/api/audit/report/task-001/pdf' },
+    advice: {
+      recommendations: [],
+      documentPreview: '',
+      applicationDocumentPreview: '',
+      powerOfAttorneyPreview: '',
+      documentDownloadUrl: '/api/audit/report/task-001/pdf',
+    },
     registrationStrategy: {
       targetMarkets: ['越南'],
       hasChinaBase: false,
