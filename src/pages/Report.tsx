@@ -446,14 +446,11 @@ function Report() {
           <Empty description="暂无建议" />
         )}
       </Card>
-      <Card
-        title="文书生成说明"
-        extra={<Tag color="blue">Markdown 可下载</Tag>}
-      >
-        <Paragraph type="secondary" style={{ margin: 0 }}>
-          当前阶段生成防御性合规规划书 Markdown 预览，适合复制到飞书或作为 PDF 模板的数据源。正式 PDF 下载将在后续部署/模板阶段处理。
-        </Paragraph>
-      </Card>
+        <Card title="报告生成说明" extra={<Tag color="blue">Markdown 可下载</Tag>}>
+          <Paragraph type="secondary" style={{ margin: 0 }}>
+          当前阶段根据审查风险等级自动选择红/黄/绿三种模板，生成 7 板块《越南商标注册合规预检报告》Markdown 预览，适合复制到飞书或作为 PDF 模板的数据源。
+          </Paragraph>
+        </Card>
       <DocumentPreviewCard brandName={result.brandName} content={advice.documentPreview} />
     </Space>
   )
@@ -475,7 +472,7 @@ function Report() {
           { key: 'm3', label: 'M3 文化禁忌', children: culturalRiskTab },
           { key: 'm4', label: 'M4 注册策略', children: registrationStrategyTab },
           { key: 'm5', label: 'M5 风控与维权', children: monitoringPlaceholderTab },
-          { key: 'm6', label: 'M6 文书生成', children: documentGenerationTab },
+          { key: 'm6', label: 'M6 报告生成', children: documentGenerationTab },
         ]}
       />
     </Space>

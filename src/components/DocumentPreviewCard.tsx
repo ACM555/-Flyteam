@@ -24,7 +24,7 @@ function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(content)
-      message.success('文书内容已复制')
+      message.success('报告内容已复制')
     } catch {
       message.error('复制失败，请手动选择文本复制')
     }
@@ -32,12 +32,12 @@ function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
 
   const handleDownload = () => {
     const safeName = brandName.trim() || 'outbound-guard-report'
-    downloadMarkdown(`${safeName}-越南商标合规规划书.md`, content)
+    downloadMarkdown(`${safeName}-越南商标注册合规预检报告.md`, content)
   }
 
   return (
     <Card
-      title="M6 · 防御性合规规划书"
+      title="M6 · 越南商标注册合规预检报告"
       extra={
         <Space>
           <Button disabled={!content} icon={<CopyOutlined />} onClick={handleCopy}>
@@ -78,11 +78,11 @@ function DocumentPreviewCard({ brandName, content }: DocumentPreviewCardProps) {
             )
           })}
           <Text type="secondary">
-            当前下载为 Markdown 演示文书；正式 PDF 排版和盖章版模板将在后续阶段处理。
+            当前下载为 Markdown 预检报告；正式 PDF 排版模板将在后续阶段处理。
           </Text>
         </div>
       ) : (
-        <Empty description="暂无文书预览" />
+        <Empty description="暂无报告预览" />
       )}
     </Card>
   )

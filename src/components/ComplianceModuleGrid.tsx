@@ -68,8 +68,8 @@ const modules: ModuleConfig[] = [
   },
   {
     key: 'M6',
-    title: 'M6 · 文书生成',
-    subtitle: '合规建议 + Markdown 预览',
+    title: 'M6 · 报告生成',
+    subtitle: '红黄绿模板 + Markdown 报告',
     color: '#52c41a',
     icon: <FileDoneOutlined />,
     description: '根据审查结果生成建议清单和防御性合规规划书预览。',
@@ -93,7 +93,7 @@ function getModuleMetric(moduleKey: string, result?: AuditResult | null) {
     return { label: '硬规则命中', value: Math.min(absoluteCount * 25, 100), text: `${absoluteCount} 项` }
   }
   if (moduleKey === 'M6') {
-    return { label: '建议生成', value: result.advice.recommendations.length > 0 ? 100 : 0 }
+    return { label: '报告生成', value: result.advice.documentPreview ? 100 : 0 }
   }
   return null
 }

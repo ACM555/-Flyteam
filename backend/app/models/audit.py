@@ -139,7 +139,7 @@ class AuditResult(BaseModel):
         default_factory=list,
         description="匹配品牌列表，每项含 name/thumbnailUrl/matchScore",
     )
-    documentPreview: str = Field("", description="防御性合规规划书 Markdown 预览")
+    documentPreview: str = Field("", description="越南商标注册合规预检报告 Markdown 预览")
     registrationStrategy: RegistrationStrategy = Field(
         default_factory=RegistrationStrategy,
         description="M4 跨域注册策略",

@@ -49,6 +49,9 @@ class AuditEngineTest(unittest.TestCase):
         self.assertGreaterEqual(result["riskScore"], 80)
         self.assertTrue(any("重要冲突线索" in rule["note"] for rule in result["hitRules"]))
         self.assertFalse(any("已经构成侵权" in rule["note"] for rule in result["hitRules"]))
+        self.assertIn("**风险评级**：🔴 **高风险**", result["documentPreview"])
+        self.assertIn("**⛔ C. 强烈不建议提交**", result["documentPreview"])
+        self.assertIn("## 7. 免责声明", result["documentPreview"])
 
     def test_complete_unknown_brand_is_low_risk(self):
         logo = make_plain_logo_base64()
@@ -65,6 +68,8 @@ class AuditEngineTest(unittest.TestCase):
         self.assertEqual(result["riskLevel"], "low")
         self.assertIn("当前有限范围内未命中明显风险", result["overallResult"])
         self.assertNotIn("放心使用", result["overallResult"])
+        self.assertIn("**风险评级**：✅ **低风险**", result["documentPreview"])
+        self.assertIn("**✅ A. 可以提交注册**", result["documentPreview"])
 
     def test_success_rate_request_is_rejected(self):
         logo = make_plain_logo_base64()
@@ -81,6 +86,8 @@ class AuditEngineTest(unittest.TestCase):
         self.assertEqual(result["riskLevel"], "medium")
         self.assertTrue(any("不能提供注册成功率" in rule["note"] for rule in result["hitRules"]))
         self.assertFalse(any("预计成功率" in rule["note"] for rule in result["hitRules"]))
+        self.assertIn("**风险评级**：🟡 **中风险**", result["documentPreview"])
+        self.assertIn("**🟡 B. 修改后提交**", result["documentPreview"])
 
 
 if __name__ == "__main__":

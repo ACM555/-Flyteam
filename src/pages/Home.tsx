@@ -33,8 +33,8 @@ const capabilities = [
     background: '#fffbe6',
   },
   {
-    title: '防御文书生成',
-    description: '把审查结论沉淀为合规建议和防御性规划书，辅助团队后续应对。',
+    title: '合规报告生成',
+    description: '把审查结论沉淀为红黄绿三种合规预检报告，辅助团队后续决策。',
     hint: '适合法务与业务同步决策',
     icon: <SolutionOutlined />,
     color: '#52c41a',
