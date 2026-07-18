@@ -1,8 +1,10 @@
+import { DownloadOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
   Card,
   Col,
+  Descriptions,
   Empty,
   Image,
   List,
@@ -15,6 +17,8 @@ import {
   Table,
   Tabs,
   Tag,
+  Timeline,
+  Tooltip,
   Typography,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
@@ -29,20 +33,18 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { getAuditResult } from '@/api/audit'
-import ComplianceModuleGrid from '@/components/ComplianceModuleGrid'
-import DocumentPreviewCard from '@/components/DocumentPreviewCard'
 import HitRuleList from '@/components/HitRuleList'
 import LegalReferenceCollapse from '@/components/LegalReferenceCollapse'
-import ReportActionPanel from '@/components/ReportActionPanel'
 import RiskSummaryCard from '@/components/RiskSummaryCard'
 import type { AuditResult } from '@/types/audit'
-import { getCurrentTaskId, setCurrentTaskId } from '@/utils/auditHistory'
 
 const { Paragraph, Text, Title } = Typography
 
 const reviewSteps = [
   { title: '法条规则匹配' },
   { title: '多模态视觉比对' },
+  { title: '跨类驰护扫描' },
+  { title: '文化禁忌审查' },
   { title: '风险综合评估' },
 ]
 
@@ -73,26 +75,11 @@ type ReportRouteState = {
   taskId?: string
 }
 
-function StatisticLike({ title, value }: { title: string; value: string }) {
-  return (
-    <Space direction="vertical" size={4} style={{ display: 'flex' }}>
-      <Text type="secondary">{title}</Text>
-      <Text strong style={{ fontSize: 16 }}>
-        {value}
-      </Text>
-    </Space>
-  )
-}
-
-function isRecommendedOption(option: string, recommendedPath: string) {
-  return recommendedPath === option || recommendedPath.includes(option)
-}
-
 function Report() {
   const location = useLocation()
   const navigate = useNavigate()
   const params = useParams<{ taskId?: string }>()
-  const taskId = params.taskId ?? (location.state as ReportRouteState | null)?.taskId ?? getCurrentTaskId()
+  const taskId = params.taskId ?? (location.state as ReportRouteState | null)?.taskId
   const [result, setResult] = useState<AuditResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -100,12 +87,10 @@ function Report() {
 
   useEffect(() => {
     if (!taskId) {
-      setError('当前没有可查看的审查报告，请先提交品牌信息。')
+      setError('缺少任务ID，请从提交页重新进入')
       setLoading(false)
       return undefined
     }
-
-    setCurrentTaskId(taskId)
 
     const clearTimer = () => {
       if (timerRef.current) {
@@ -135,7 +120,7 @@ function Report() {
         timerRef.current = window.setTimeout(poll, 2000)
       } catch {
         clearTimer()
-        setError('任务不存在或后端服务已重启，请返回提交页重新提交。')
+        setError('网络请求失败，请检查后端服务')
         setLoading(false)
       }
     }
@@ -155,7 +140,7 @@ function Report() {
         subTitle={error}
         extra={
           <Button type="primary" onClick={() => navigate('/submit')}>
-            重新提交
+            返回提交页重试
           </Button>
         }
       />
@@ -197,9 +182,9 @@ function Report() {
   }
 
   const { absolute, advice, relative, visual } = result
-  const { registrationStrategy } = result
+  const { intelligence } = result
 
-  const intelligentPrecheckTab = (
+  const absoluteTab = (
     <Space direction="vertical" size={24} style={{ display: 'flex' }}>
       <HitRuleList hitRules={result.hitRules} />
       <Row gutter={[24, 24]}>
@@ -213,37 +198,6 @@ function Report() {
                 format={(percent) => `${percent}%`}
               />
             </div>
-          </Card>
-        </Col>
-        <Col xs={24} lg={14}>
-          <Card title="OpenCV 视觉特征雷达">
-            {visual.radarData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <RadarChart data={visual.radarData} outerRadius="68%">
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="dimension" />
-                  <Radar
-                    dataKey="target"
-                    name="上传商标"
-                    stroke="#1677ff"
-                    fill="#1677ff"
-                    fillOpacity={0.3}
-                    isAnimationActive={false}
-                  />
-                  <Radar
-                    dataKey="benchmark"
-                    name="风险基准"
-                    stroke="#ff4d4f"
-                    fill="#ff4d4f"
-                    fillOpacity={0.2}
-                    isAnimationActive={false}
-                  />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
-            ) : (
-              <Empty description="暂无视觉分析数据" />
-            )}
           </Card>
         </Col>
       </Row>
@@ -286,143 +240,75 @@ function Report() {
     </Space>
   )
 
-  const culturalRiskTab = (
+  const referenceTab = (
     <Space direction="vertical" size={24} style={{ display: 'flex' }}>
-      <Alert
-        message="越南硬规则与文化禁忌审查"
-        description="当前阶段优先覆盖纯中文/非常用文字、公共标志、显著性不足、误导性描述等越南商标审查硬规则；东盟多国禁忌表将在后续扩展。"
-        type="warning"
-        showIcon
-      />
-      <Card title="硬规则命中">
-        <HitRuleList hitRules={result.hitRules.filter((rule) => rule.ruleType === 'absolute')} />
-      </Card>
       <Card title="法律依据">
         <LegalReferenceCollapse references={result.references} />
       </Card>
     </Space>
   )
 
-  const registrationStrategyTab = (
+  const visualTab = (
     <Space direction="vertical" size={24} style={{ display: 'flex' }}>
-      <Alert
-        message={`推荐路径：${registrationStrategy.recommendedPath || '待生成'}`}
-        description={registrationStrategy.reason || '暂无注册策略结果'}
-        type="info"
-        showIcon
-      />
-      <Card title="策略摘要">
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}>
-            <StatisticLike title="目标市场" value={registrationStrategy.targetMarkets.join('、') || '未填写'} />
-          </Col>
-          <Col xs={24} md={8}>
-            <StatisticLike
-              title="中国基础"
-              value={registrationStrategy.hasChinaBase ? '已有注册/申请' : '暂无或不确定'}
-            />
-          </Col>
-          <Col xs={24} md={8}>
-            <StatisticLike title="成本提示" value={registrationStrategy.costSaving || '待评估'} />
-          </Col>
-        </Row>
-      </Card>
-      <Row gutter={[16, 16]}>
-        {registrationStrategy.costComparison.map((item) => (
-          <Col key={item.option} xs={24} md={8}>
-            <Card title={item.option} style={{ height: '100%' }}>
-              <Space direction="vertical" size={8} style={{ display: 'flex' }}>
-                <Tag color={isRecommendedOption(item.option, registrationStrategy.recommendedPath) ? 'green' : 'blue'}>
-                  {isRecommendedOption(item.option, registrationStrategy.recommendedPath) ? '推荐路径' : item.costLevel}
-                </Tag>
-                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                  速度：{item.speed}
-                </Paragraph>
-                <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                  适用：{item.suitableFor}
-                </Paragraph>
-                <Paragraph style={{ marginBottom: 0 }}>{item.note}</Paragraph>
-              </Space>
+      {visual.radarData.length > 0 ? (
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={14}>
+            <Card title="视觉特征雷达比对">
+              <ResponsiveContainer width="100%" height={320}>
+                <RadarChart data={visual.radarData} outerRadius="68%">
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="dimension" />
+                  <Radar
+                    dataKey="target"
+                    name="上传商标"
+                    stroke="#1677ff"
+                    fill="#1677ff"
+                    fillOpacity={0.3}
+                    isAnimationActive={false}
+                  />
+                  <Radar
+                    dataKey="benchmark"
+                    name="对标品牌"
+                    stroke="#ff4d4f"
+                    fill="#ff4d4f"
+                    fillOpacity={0.3}
+                    isAnimationActive={false}
+                  />
+                  <Legend />
+                </RadarChart>
+              </ResponsiveContainer>
             </Card>
           </Col>
-        ))}
-      </Row>
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Card title="推进时间轴">
-            <Steps
-              direction="vertical"
-              items={registrationStrategy.timeline.map((item) => ({
-                title: `${item.stage} · ${item.duration}`,
-                description: item.action,
-              }))}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="商品/服务本地化改写">
-            <List
-              dataSource={registrationStrategy.localizedGoodsServices}
-              locale={{ emptyText: '暂无本地化建议' }}
-              renderItem={(item) => (
-                <List.Item>
-                  <Space direction="vertical" size={6} style={{ display: 'flex' }}>
-                    <Tag color={item.market === '越南' ? 'red' : 'blue'}>{item.market}</Tag>
-                    <Text strong>{item.localized}</Text>
-                    <Text type="secondary">{item.note}</Text>
-                  </Space>
-                </List.Item>
+          <Col xs={24} lg={10}>
+            <Card title="相似品牌对标" style={{ height: '100%' }}>
+              {visual.matchedBrands.length > 0 ? (
+                <List
+                  dataSource={visual.matchedBrands}
+                  renderItem={(brand) => (
+                    <List.Item>
+                      <Space size={16}>
+                        <Image alt={brand.name} width={80} preview={false} src={brand.thumbnailUrl} />
+                        <Space direction="vertical" size={4}>
+                          <Text strong>{brand.name}</Text>
+                          <Tag color="orange">匹配分值 {brand.matchScore}</Tag>
+                        </Space>
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              ) : (
+                <Empty description="暂无匹配品牌" />
               )}
-            />
-          </Card>
-        </Col>
-      </Row>
-      <Card title="策略风险提示">
-        {registrationStrategy.risks.length > 0 ? (
-          <List
-            dataSource={registrationStrategy.risks}
-            renderItem={(risk) => (
-              <List.Item>
-                <Alert message={risk} type="warning" showIcon style={{ width: '100%' }} />
-              </List.Item>
-            )}
-          />
-        ) : (
-          <Empty description="暂无策略风险提示" />
-        )}
-      </Card>
+            </Card>
+          </Col>
+        </Row>
+      ) : (
+        <Empty description="暂无视觉分析数据" />
+      )}
     </Space>
   )
 
-  const monitoringPlaceholderTab = (
-    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
-      <Alert
-        message="风控与维权监测"
-        description="围绕公告监控、法规预警和反向风险建立持续跟踪入口，便于企业在申请后继续管理商标风险。"
-        type="warning"
-        showIcon
-      />
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={8}>
-          <Card title="抢注预警">
-            <Paragraph type="secondary">未来接入 NOIP 周公告 PDF/OCR，监控近似新申请和 5 个月异议窗口。</Paragraph>
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card title="法规预警">
-            <Paragraph type="secondary">未来抓取主管机关公告并由模型摘要标签化，提示对申请/异议/维权的影响。</Paragraph>
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card title="反向风险">
-            <Paragraph type="secondary">未来定期跑全库 Top-K，提示他人相似标对我方经营造成的潜在威胁。</Paragraph>
-          </Card>
-        </Col>
-      </Row>
-    </Space>
-  )
-
-  const documentGenerationTab = (
+  const adviceTab = (
     <Space direction="vertical" size={24} style={{ display: 'flex' }}>
       <Card title="处置建议清单">
         {advice.recommendations.length > 0 ? (
@@ -446,54 +332,173 @@ function Report() {
           <Empty description="暂无建议" />
         )}
       </Card>
-      <Card title="报告生成说明" extra={<Tag color="blue">Markdown 可下载</Tag>}>
-        <Paragraph type="secondary" style={{ margin: 0 }}>
-          当前阶段根据审查结果生成三份 M6 材料：① 红/黄/绿风险模板对应的《越南商标注册合规预检报告》；
-          ② 按上传 Word 模板格式生成的《商标注册申请书》；③ 按上传 Word 模板格式生成的《商标代理委托书》。
-          三份材料均可复制或下载 Markdown，正式提交前应由越南本地代理机构补充申请人、代理机构、签章和认证信息。
-        </Paragraph>
+      <Card
+        title="防御性合规规划书（预览）"
+        extra={
+          <Tooltip title={advice.documentDownloadUrl ? '下载 PDF 合规规划书' : '报告尚未生成'}>
+            <Button
+              disabled={!advice.documentDownloadUrl}
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                if (advice.documentDownloadUrl) {
+                  window.open(advice.documentDownloadUrl, '_blank', 'noopener,noreferrer')
+                }
+              }}
+            >
+              下载完整文书
+            </Button>
+          </Tooltip>
+        }
+      >
+        {advice.documentPreview ? (
+          advice.documentPreview.split('\n\n').map((paragraph) => (
+            <Paragraph key={paragraph} style={{ whiteSpace: 'pre-line' }}>
+              {paragraph}
+            </Paragraph>
+          ))
+        ) : (
+          <Empty description="暂无文书预览" />
+        )}
       </Card>
-      <Tabs
-        items={[
-          {
-            key: 'risk-report',
-            label: '合规预检报告',
-            children: (
-              <DocumentPreviewCard
-                brandName={result.brandName}
-                content={advice.documentPreview}
-                filenameSuffix="越南商标注册合规预检报告"
-              />
-            ),
-          },
-          {
-            key: 'application',
-            label: '商标注册申请书',
-            children: (
-              <DocumentPreviewCard
-                brandName={result.brandName}
-                content={advice.applicationDocumentPreview}
-                title="M6 · 商标注册申请书"
-                emptyDescription="暂无申请书预览"
-                filenameSuffix="商标注册申请书"
-              />
-            ),
-          },
-          {
-            key: 'poa',
-            label: '商标代理委托书',
-            children: (
-              <DocumentPreviewCard
-                brandName={result.brandName}
-                content={advice.powerOfAttorneyPreview}
-                title="M6 · 商标代理委托书"
-                emptyDescription="暂无委托书预览"
-                filenameSuffix="商标代理委托书"
-              />
-            ),
-          },
-        ]}
-      />
+    </Space>
+  )
+
+  const intelligenceTab = (
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={8}>
+          <Card
+            className="insight-card"
+            title={intelligence.crossClassShield.title}
+            extra={
+              <Tag color={intelligence.crossClassShield.triggered ? 'red' : 'green'}>
+                {intelligence.crossClassShield.triggered ? '触发复核' : '未触发'}
+              </Tag>
+            }
+          >
+            <Progress
+              percent={intelligence.crossClassShield.score}
+              status={intelligence.crossClassShield.triggered ? 'exception' : 'normal'}
+            />
+            <Paragraph>{intelligence.crossClassShield.explanation}</Paragraph>
+            <List
+              size="small"
+              dataSource={intelligence.crossClassShield.protectedElements}
+              renderItem={(item) => <List.Item>{item}</List.Item>}
+            />
+            <Alert message={intelligence.crossClassShield.suggestedAction} type="warning" showIcon />
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card
+            className="insight-card"
+            title={intelligence.refusalHistory.title}
+            extra={
+              <Tag color={intelligence.refusalHistory.triggered ? 'volcano' : 'green'}>
+                {intelligence.refusalHistory.triggered ? '红牌信号' : '观察'}
+              </Tag>
+            }
+          >
+            <Paragraph>{intelligence.refusalHistory.explanation}</Paragraph>
+            <List
+              size="small"
+              header={<Text strong>风险信号</Text>}
+              dataSource={intelligence.refusalHistory.redFlags}
+              renderItem={(item) => <List.Item>{item}</List.Item>}
+            />
+            <List
+              size="small"
+              header={<Text strong>证据来源</Text>}
+              dataSource={intelligence.refusalHistory.evidence}
+              renderItem={(item) => <List.Item>{item}</List.Item>}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card className="insight-card" title={intelligence.culturalReview.title}>
+            <Descriptions
+              column={1}
+              items={[
+                { key: 'country', label: '目标国家', children: intelligence.culturalReview.country },
+                {
+                  key: 'status',
+                  label: '审查状态',
+                  children: intelligence.culturalReview.triggered ? '存在需复核事项' : '未触发高风险禁忌',
+                },
+              ]}
+            />
+            <List
+              size="small"
+              dataSource={intelligence.culturalReview.rules}
+              renderItem={(rule) => (
+                <List.Item>
+                  <Space direction="vertical" size={2}>
+                    <Text strong className={`severity-${rule.severity}`}>
+                      {rule.label}
+                    </Text>
+                    <Text type="secondary">{rule.note}</Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={14}>
+          <Card title="跨域注册策略">
+            <Descriptions
+              column={1}
+              items={[
+                { key: 'route', label: '推荐路径', children: intelligence.registrationStrategy.route },
+                {
+                  key: 'markets',
+                  label: '覆盖市场',
+                  children: `${intelligence.registrationStrategy.marketCount} 个`,
+                },
+                { key: 'rationale', label: '推荐理由', children: intelligence.registrationStrategy.rationale },
+              ]}
+            />
+            <Timeline
+              style={{ marginTop: 18 }}
+              items={intelligence.registrationStrategy.timeline.map((item) => ({
+                children: (
+                  <Space direction="vertical" size={2}>
+                    <Text strong>{item.stage}</Text>
+                    <Text type="secondary">
+                      {item.duration} · {item.output}
+                    </Text>
+                  </Space>
+                ),
+              }))}
+            />
+            <List
+              size="small"
+              dataSource={intelligence.registrationStrategy.costNotes}
+              renderItem={(item) => <List.Item>{item}</List.Item>}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} lg={10}>
+          <Card title="注册后监控计划">
+            <List
+              dataSource={intelligence.monitoring}
+              renderItem={(item) => (
+                <List.Item>
+                  <Space direction="vertical" size={4}>
+                    <Text strong>{item.name}</Text>
+                    <Text type="secondary">
+                      {item.cadence} · {item.source}
+                    </Text>
+                    <Tag color="blue">{item.actionWindow}</Tag>
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
+      </Row>
     </Space>
   )
 
@@ -503,18 +508,14 @@ function Report() {
         商标合规审查报告
       </Title>
       <RiskSummaryCard data={result} />
-      <ReportActionPanel result={result} />
-      <Card title="6 大模块执行总览">
-        <ComplianceModuleGrid result={result} />
-      </Card>
       <Tabs
         items={[
-          { key: 'm1', label: 'M1 智能预检', children: intelligentPrecheckTab },
-          { key: 'm2', label: 'M2 侵权检索', children: relativeTab },
-          { key: 'm3', label: 'M3 文化禁忌', children: culturalRiskTab },
-          { key: 'm4', label: 'M4 注册策略', children: registrationStrategyTab },
-          { key: 'm5', label: 'M5 风控与维权', children: monitoringPlaceholderTab },
-          { key: 'm6', label: 'M6 报告生成', children: documentGenerationTab },
+          { key: 'intelligence', label: '参赛亮点', children: intelligenceTab },
+          { key: 'rules', label: '规则命中', children: absoluteTab },
+          { key: 'relative', label: '相对驳回分析', children: relativeTab },
+          { key: 'references', label: '法律依据', children: referenceTab },
+          { key: 'visual', label: '视觉相似度', children: visualTab },
+          { key: 'advice', label: '法律建议', children: adviceTab },
         ]}
       />
     </Space>

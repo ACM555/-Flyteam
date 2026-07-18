@@ -3,42 +3,42 @@ import {
   Button,
   Card,
   Col,
-  Empty,
   Form,
   Input,
-  List,
-  Popconfirm,
+  InputNumber,
+  Radio,
   Row,
   Select,
   Space,
   Steps,
+  Switch,
   Tag,
   Typography,
 } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { audit } from '@/api'
+import { getCountryRules, type CountryRule } from '@/api/platform'
 import LogoUpload from '@/components/LogoUpload'
 import type { AuditFormData } from '@/types/audit'
-import {
-  getAuditHistory,
-  removeAuditTask,
-  saveAuditTask,
-  setCurrentTaskId,
-  type AuditHistoryItem,
-} from '@/utils/auditHistory'
 
-const { Paragraph, Title } = Typography
+const { Paragraph, Text, Title } = Typography
 
 const initialForm: AuditFormData = {
   brandName: '',
   englishName: '',
   niceClass: '',
   goodsServices: '',
-  targetMarkets: ['越南'],
-  hasChinaBase: false,
+  targetCountries: ['越南'],
+  operationStage: 'pre-entry',
+  plannedMarkets: 1,
+  hasChinaBaseMark: false,
   logo: '',
 }
+
+const TARGET_COUNTRY_OPTIONS = ['越南', '泰国', '印尼', '马来西亚', '菲律宾', '新加坡'].map(
+  (country) => ({ value: country, label: country }),
+)
 
 const COMMON_NICE_CLASSES = [
   '第43类-餐饮服务',
@@ -95,19 +95,6 @@ const NICE_CLASS_NAMES = [
   '法律服务',
 ]
 
-const TARGET_MARKET_OPTIONS = [
-  '越南',
-  '泰国',
-  '印尼',
-  '马来西亚',
-  '菲律宾',
-  '新加坡',
-  '柬埔寨',
-  '老挝',
-  '缅甸',
-  '文莱',
-].map((value) => ({ value, label: value }))
-
 export const NICE_CLASS_OPTIONS = NICE_CLASS_NAMES.map(
   (name, index) => `第${index + 1}类-${name}`,
 )
@@ -126,24 +113,40 @@ export const NICE_CLASS_OPTIONS = NICE_CLASS_NAMES.map(
 function Submit() {
   const [form] = Form.useForm<AuditFormData>()
   const [submitLoading, setSubmitLoading] = useState(false)
-  const [history, setHistory] = useState<AuditHistoryItem[]>([])
+  const [countryRules, setCountryRules] = useState<CountryRule[]>([])
   const navigate = useNavigate()
   const { message } = AntdApp.useApp()
-
-  const refreshHistory = () => setHistory(getAuditHistory())
+  const selectedCountries = Form.useWatch('targetCountries', form) ?? initialForm.targetCountries
 
   useEffect(() => {
-    refreshHistory()
+    getCountryRules()
+      .then(setCountryRules)
+      .catch(() => setCountryRules([]))
   }, [])
+
+  const activeCountryRules = useMemo(
+    () => countryRules.filter((rule) => selectedCountries?.includes(rule.country)),
+    [countryRules, selectedCountries],
+  )
+
+  const fillDemo = () => {
+    form.setFieldsValue({
+      brandName: '墨兰奶白',
+      englishName: 'Molan Tea',
+      niceClass: '第43类-餐饮服务',
+      goodsServices: '茶饮及餐饮门店服务，计划进入越南门店和外卖平台。',
+      targetCountries: ['越南', '泰国'],
+      operationStage: 'pre-entry',
+      plannedMarkets: 3,
+      hasChinaBaseMark: false,
+    })
+  }
 
   const handleFinish = async (values: AuditFormData) => {
     setSubmitLoading(true)
 
     try {
-      const requestPayload = { ...values, logo: values.logo.trim() }
-      const result = await audit(requestPayload)
-      saveAuditTask(result.data.taskId, requestPayload)
-      refreshHistory()
+      const result = await audit({ ...values, logo: values.logo.trim() })
       message.success('审查任务已提交')
       navigate('/reviewing', { state: { taskId: result.data.taskId } })
     } catch (error) {
@@ -154,41 +157,25 @@ function Submit() {
     }
   }
 
-  const handleViewProgress = (item: AuditHistoryItem) => {
-    setCurrentTaskId(item.taskId)
-    navigate('/reviewing', { state: { taskId: item.taskId } })
-  }
-
-  const handleViewReport = (item: AuditHistoryItem) => {
-    setCurrentTaskId(item.taskId)
-    navigate(`/report/${item.taskId}`, { state: { taskId: item.taskId } })
-  }
-
-  const handleDeleteHistory = (taskId: string) => {
-    removeAuditTask(taskId)
-    refreshHistory()
-    message.success('历史记录已删除')
-  }
-
-  const handleReset = () => {
-    form.resetFields()
-    message.info('表单已重置，可重新提交新的审查任务')
-  }
-
   return (
-    <div style={{ maxWidth: 1040 }}>
+    <div>
       <div style={{ marginBottom: 32 }}>
-        <Title level={2} style={{ marginBottom: 8 }}>
-          品牌信息提交
-        </Title>
-        <Paragraph type="secondary" style={{ fontSize: 15, marginBottom: 0 }}>
-          填写品牌资料，AI 将在 3-5 秒内完成越南商标合规审查。
-        </Paragraph>
+        <Space align="start" style={{ display: 'flex', justifyContent: 'space-between' }} wrap>
+          <div>
+            <Title level={2} style={{ marginBottom: 8 }}>
+              品牌信息提交
+            </Title>
+            <Paragraph type="secondary" style={{ fontSize: 15, marginBottom: 0 }}>
+              填写品牌、目标市场和出海阶段，系统会生成商标预检、文化禁忌、跨类驰护和注册路径建议。
+            </Paragraph>
+          </div>
+          <Button onClick={fillDemo}>填入比赛演示案例</Button>
+        </Space>
         <Steps
           current={0}
           items={[{ title: '填写信息' }, { title: 'AI 审查' }, { title: '查看报告' }]}
           size="small"
-          style={{ marginTop: 18, maxWidth: 680 }}
+          style={{ marginTop: 18, maxWidth: 760 }}
         />
       </div>
 
@@ -198,190 +185,172 @@ function Submit() {
         layout="vertical"
         onFinish={handleFinish}
       >
-        <Card
-          title="基础信息"
-          style={{ marginBottom: 24 }}
-          styles={{ body: { paddingBottom: 8 } }}
-        >
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
+        <Row gutter={[24, 24]}>
+          <Col xs={24} xl={16}>
+            <Card
+              title="基础信息"
+              style={{ marginBottom: 24 }}
+              styles={{ body: { paddingBottom: 8 } }}
+            >
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="品牌名称"
+                    name="brandName"
+                    rules={[
+                      { required: true, message: '请输入品牌名称' },
+                      { max: 50, message: '品牌名称不能超过 50 个字符' },
+                    ]}
+                  >
+                    <Input placeholder="请输入品牌名称（支持中文/越南语）" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="品牌英文名称"
+                    name="englishName"
+                    rules={[
+                      { required: true, message: '请输入品牌英文名称' },
+                      { max: 100, message: '品牌英文名称不能超过 100 个字符' },
+                      {
+                        pattern: /^[a-zA-Z0-9\s\-&]+$/,
+                        message: '仅允许字母、数字、空格、连字符和 &',
+                      },
+                    ]}
+                  >
+                    <Input placeholder="请输入品牌英文名称" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
               <Form.Item
-                label="品牌名称"
-                name="brandName"
-                rules={[
-                  { required: true, message: '请输入品牌名称' },
-                  { max: 50, message: '品牌名称不能超过 50 个字符' },
-                ]}
-              >
-                <Input placeholder="请输入品牌名称（支持中文/越南语）" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item
-                label="品牌英文名称"
-                name="englishName"
-                rules={[
-                  { required: true, message: '请输入品牌英文名称' },
-                  { max: 100, message: '品牌英文名称不能超过 100 个字符' },
-                  {
-                    pattern: /^[a-zA-Z0-9\s\-&]+$/,
-                    message: '仅允许字母、数字、空格、连字符和 &',
-                  },
-                ]}
-              >
-                <Input placeholder="请输入品牌英文名称" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            label="尼斯分类"
-            name="niceClass"
-            rules={[{ required: true, message: '请选择尼斯分类' }]}
-          >
-            <Select
-              showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? '')
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              options={NICE_CLASS_OPTIONS}
-              placeholder="请选择尼斯分类"
-            />
-          </Form.Item>
-        </Card>
-
-        <Card title="品牌详情">
-          <Form.Item
-            label="商品/服务描述"
-            name="goodsServices"
-            rules={[
-              { required: true, message: '请输入商品/服务描述' },
-              { max: 500, message: '商品/服务描述不能超过 500 个字符' },
-            ]}
-          >
-            <Input.TextArea
-              maxLength={500}
-              placeholder="请描述品牌主营业务、目标市场、出海计划等"
-              rows={4}
-              showCount
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="品牌 Logo"
-            name="logo"
-            rules={[{ required: true, message: '请上传品牌 Logo' }]}
-          >
-            <LogoUpload />
-          </Form.Item>
-        </Card>
-
-        <Card
-          title="跨域注册策略"
-          style={{ marginTop: 24 }}
-          styles={{ body: { paddingBottom: 8 } }}
-        >
-          <Row gutter={16}>
-            <Col xs={24} md={14}>
-              <Form.Item
-                label="目标市场"
-                name="targetMarkets"
-                rules={[{ required: true, message: '请选择至少一个目标市场' }]}
+                label="尼斯分类"
+                name="niceClass"
+                rules={[{ required: true, message: '请选择尼斯分类' }]}
               >
                 <Select
-                  mode="multiple"
-                  options={TARGET_MARKET_OPTIONS}
-                  placeholder="请选择目标市场"
-                  maxTagCount="responsive"
+                  showSearch
+                  filterOption={(input, option) =>
+                    String(option?.label ?? '')
+                      .toLowerCase()
+                      .includes(input.toLowerCase())
+                  }
+                  options={NICE_CLASS_OPTIONS}
+                  placeholder="请选择尼斯分类"
                 />
               </Form.Item>
-            </Col>
-            <Col xs={24} md={10}>
+            </Card>
+
+            <Card
+              title="出海策略"
+              style={{ marginBottom: 24 }}
+              styles={{ body: { paddingBottom: 8 } }}
+            >
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label="目标国家"
+                    name="targetCountries"
+                    rules={[{ required: true, message: '请选择至少一个目标国家' }]}
+                  >
+                    <Select
+                      mode="multiple"
+                      options={TARGET_COUNTRY_OPTIONS}
+                      placeholder="请选择目标国家"
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item label="计划覆盖市场数" name="plannedMarkets">
+                    <InputNumber min={1} max={10} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col xs={24} md={16}>
+                  <Form.Item label="当前阶段" name="operationStage">
+                    <Radio.Group
+                      optionType="button"
+                      buttonStyle="solid"
+                      options={[
+                        { value: 'pre-entry', label: '注册前预检' },
+                        { value: 'launching', label: '注册中导航' },
+                        { value: 'operating', label: '注册后风控' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
+                  <Form.Item label="已有中国基础标" name="hasChinaBaseMark" valuePropName="checked">
+                    <Switch checkedChildren="有" unCheckedChildren="无" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+
+            <Card title="品牌详情">
               <Form.Item
-                label="是否已有中国基础商标/申请"
-                name="hasChinaBase"
-                rules={[{ required: true, message: '请选择中国基础商标状态' }]}
+                label="商品/服务描述"
+                name="goodsServices"
+                rules={[
+                  { required: true, message: '请输入商品/服务描述' },
+                  { max: 500, message: '商品/服务描述不能超过 500 个字符' },
+                ]}
               >
-                <Select
-                  options={[
-                    { value: true, label: '已有中国注册/申请' },
-                    { value: false, label: '暂无或不确定' },
-                  ]}
-                  placeholder="请选择"
+                <Input.TextArea
+                  maxLength={500}
+                  placeholder="请描述品牌主营业务、目标市场、出海计划等"
+                  rows={4}
+                  showCount
                 />
               </Form.Item>
-            </Col>
-          </Row>
-          <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-            系统将根据目标市场数量、中国基础状态和核心市场覆盖情况，生成单国申请、马德里体系或混合路径建议。
-          </Paragraph>
-        </Card>
+
+              <Form.Item
+                label="品牌 Logo"
+                name="logo"
+                rules={[{ required: true, message: '请上传品牌 Logo' }]}
+              >
+                <LogoUpload />
+              </Form.Item>
+            </Card>
+          </Col>
+          <Col xs={24} xl={8}>
+            <Card title="目标国规则雷达">
+              {activeCountryRules.length ? (
+                <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+                  {activeCountryRules.map((rule) => (
+                    <div className="country-rule" key={rule.country}>
+                      <Space align="start" direction="vertical" size={8}>
+                        <Text strong>{rule.country}</Text>
+                        <Paragraph type="secondary">{rule.reviewFocus}</Paragraph>
+                        <Space size={[6, 6]} wrap>
+                          {rule.riskTags.map((tag) => (
+                            <Tag color="blue" key={tag}>{tag}</Tag>
+                          ))}
+                        </Space>
+                        <Text type="secondary">{rule.legalBasis}</Text>
+                      </Space>
+                    </div>
+                  ))}
+                </Space>
+              ) : (
+                <Paragraph type="secondary">
+                  选择目标国家后，将展示对应禁忌标签、法律依据和审查重点。
+                </Paragraph>
+              )}
+            </Card>
+          </Col>
+        </Row>
 
         <div style={{ marginTop: 24, textAlign: 'right' }}>
           <Space>
-            <Button onClick={handleReset}>重置</Button>
+            <Button onClick={() => form.resetFields()}>重置</Button>
             <Button htmlType="submit" loading={submitLoading} type="primary">
               提交审查
             </Button>
           </Space>
         </div>
       </Form>
-
-      <Card title="审查历史记录" style={{ marginTop: 24 }}>
-        {history.length > 0 ? (
-          <List
-            dataSource={history}
-            renderItem={(item) => (
-              <List.Item
-                actions={[
-                  <Button key="progress" type="link" onClick={() => handleViewProgress(item)}>
-                    查看进度
-                  </Button>,
-                  <Button key="report" type="link" onClick={() => handleViewReport(item)}>
-                    查看报告
-                  </Button>,
-                  <Popconfirm
-                    key="delete"
-                    title="删除这条历史记录？"
-                    description="只会删除本地历史，不会影响已生成的后端任务。"
-                    okText="删除"
-                    cancelText="取消"
-                    onConfirm={() => handleDeleteHistory(item.taskId)}
-                  >
-                    <Button danger type="link">
-                      删除
-                    </Button>
-                  </Popconfirm>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space wrap>
-                      <span>{item.brandName || item.englishName || '未命名品牌'}</span>
-                      <Tag color="blue">{item.niceClass || '未填写类别'}</Tag>
-                    </Space>
-                  }
-                  description={
-                    <Space direction="vertical" size={4}>
-                      <span>{item.goodsServices}</span>
-                      <span>
-                        目标市场：{item.targetMarkets.join('、') || '未填写'} · 中国基础：
-                        {item.hasChinaBase ? '已有' : '暂无或不确定'} · 提交时间：
-                        {new Date(item.createdAt).toLocaleString()}
-                      </span>
-                      <span>任务ID：{item.taskId}</span>
-                    </Space>
-                  }
-                />
-              </List.Item>
-            )}
-          />
-        ) : (
-          <Empty description="暂无历史记录，提交一次审查后会显示在这里" />
-        )}
-      </Card>
     </div>
   )
 }

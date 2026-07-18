@@ -1,74 +1,111 @@
 import {
+  AlertOutlined,
+  ApiOutlined,
+  AppstoreOutlined,
+  BankOutlined,
+  DatabaseOutlined,
   FileSearchOutlined,
   FileTextOutlined,
   HomeOutlined,
+  LogoutOutlined,
   SendOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { Avatar, Layout, Menu, Typography } from 'antd'
+import { Avatar, Badge, Button, Layout, Menu, Space, Tag, Typography } from 'antd'
 import type { MenuProps } from 'antd'
-import { useLocation, useNavigate, Outlet } from 'react-router-dom'
-import { getCurrentTaskId } from '@/utils/auditHistory'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import { PageTransition } from '@/components/MotionKit'
 
 const { Content, Header, Sider } = Layout
 
-const navigationItems: MenuProps['items'] = [
-  { key: '/', icon: <HomeOutlined />, label: '首页' },
-  { key: '/submit', icon: <SendOutlined />, label: '品牌提交' },
-  { key: '/reviewing', icon: <FileSearchOutlined />, label: '审查进度' },
-  { key: '/report', icon: <FileTextOutlined />, label: '审查报告' },
-]
+function selectedKey(pathname: string) {
+  if (pathname.startsWith('/assets')) return '/assets'
+  if (pathname.startsWith('/submit')) return '/submit'
+  if (pathname.startsWith('/reviewing')) return '/reviewing'
+  if (pathname.startsWith('/reports') || pathname.startsWith('/report')) return '/reports'
+  if (pathname.startsWith('/monitoring')) return '/monitoring'
+  if (pathname.startsWith('/rules')) return '/rules'
+  if (pathname.startsWith('/admin')) return '/admin'
+  return '/'
+}
 
 function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isAuthenticated, isAdmin, logout, user } = useAuth()
 
-  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
-    const currentTaskId = getCurrentTaskId()
+  const navigationItems: MenuProps['items'] = [
+    { key: '/', icon: <HomeOutlined />, label: '风险工作台' },
+    { key: '/assets', icon: <AppstoreOutlined />, label: '品牌资产' },
+    { key: '/submit', icon: <SendOutlined />, label: '智能审查' },
+    { key: '/reviewing', icon: <FileSearchOutlined />, label: '审查进度' },
+    { key: '/reports', icon: <FileTextOutlined />, label: '报告中心' },
+    { key: '/monitoring', icon: <AlertOutlined />, label: '监控预警' },
+    { key: '/rules', icon: <DatabaseOutlined />, label: '规则库' },
+    ...(isAdmin ? [{ key: '/admin', icon: <BankOutlined />, label: '后台管理' }] : []),
+  ]
 
-    if (key === '/reviewing' && currentTaskId) {
-      navigate('/reviewing', { state: { taskId: currentTaskId } })
-      return
-    }
-
-    if (key === '/report' && currentTaskId) {
-      navigate(`/report/${currentTaskId}`, { state: { taskId: currentTaskId } })
-      return
-    }
-
-    navigate(key)
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible theme="dark" width={220}>
-        <div style={{ height: 72, display: 'flex', alignItems: 'center', padding: '0 20px' }}>
-          <Typography.Text strong style={{ color: '#fff', fontSize: 16 }}>
-            Outbound-Guard
-          </Typography.Text>
+    <Layout className="app-shell">
+      <div className="aurora-layer" aria-hidden="true" />
+      <div className="grid-layer" aria-hidden="true" />
+      <Sider className="app-sider" width={260} breakpoint="lg" collapsedWidth={0}>
+        <div className="brand-block">
+          <img alt="Outbound Guard" className="brand-mark-img" src="/assets/brand/outbound-guard-mark.svg" />
+          <div>
+            <Typography.Text strong>Outbound Guard</Typography.Text>
+            <Typography.Text type="secondary">Trademark Risk OS</Typography.Text>
+          </div>
         </div>
         <Menu
-          theme="dark"
+          className="side-menu"
           mode="inline"
           items={navigationItems}
-          selectedKeys={[location.pathname.startsWith('/report') ? '/report' : location.pathname]}
-          onClick={handleMenuClick}
+          selectedKeys={[selectedKey(location.pathname)]}
+          onClick={({ key }) => navigate(key)}
         />
+        <div className="side-status">
+          <Tag color="cyan">Live Product Mode</Tag>
+          <Typography.Paragraph>
+            覆盖注册前审查、组合资产管理、公告期监控、规则库和报告归档的完整产品闭环。
+          </Typography.Paragraph>
+        </div>
       </Sider>
       <Layout>
-        <Header
-          style={{
-            alignItems: 'center',
-            background: '#fff',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            padding: '0 24px',
-          }}
-        >
-          <Avatar icon={<UserOutlined />} />
+        <Header className="app-header">
+          <Space size={12}>
+            <Badge status="processing" text="FastAPI online" />
+            <Tag icon={<ApiOutlined />} color="geekblue">
+              ASEAN ruleset v2026.07
+            </Tag>
+          </Space>
+          <Space size={12} wrap>
+            <Button type="primary" onClick={() => navigate('/submit')}>
+              新建审查
+            </Button>
+            {isAuthenticated ? (
+              <>
+                <Typography.Text type="secondary">{user?.company || user?.username}</Typography.Text>
+                <Button aria-label="退出登录" icon={<LogoutOutlined />} onClick={handleLogout}>
+                  退出
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => navigate('/login')}>登录 / 注册</Button>
+            )}
+            <Avatar icon={<UserOutlined />} />
+          </Space>
         </Header>
-        <Content style={{ background: '#f5f5f5', padding: 24 }}>
-          <Outlet />
+        <Content className="app-content">
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </Content>
       </Layout>
     </Layout>

@@ -8,7 +8,7 @@ interface LogoUploadProps {
   value?: string
 }
 
-const validImageTypes = ['image/png', 'image/jpeg', 'image/svg+xml']
+const validImageTypes = ['image/png', 'image/jpeg']
 const maxFileSize = 5 * 1024 * 1024
 
 function readFileAsDataUrl(file: File) {
@@ -50,7 +50,7 @@ function LogoUpload({ onChange, value }: LogoUploadProps) {
 
   const handleFile = (file: RcFile) => {
     if (!validImageTypes.includes(file.type)) {
-      message.error('仅支持 JPG / PNG / SVG 格式')
+      message.error('仅支持 JPG / PNG 格式')
       return Upload.LIST_IGNORE
     }
 
@@ -99,7 +99,7 @@ function LogoUpload({ onChange, value }: LogoUploadProps) {
 
   const dragger = (
     <Upload.Dragger
-      accept="image/png,image/jpeg,image/svg+xml"
+      accept="image/png,image/jpeg"
       beforeUpload={handleFile}
       maxCount={1}
       showUploadList={false}
@@ -109,12 +109,12 @@ function LogoUpload({ onChange, value }: LogoUploadProps) {
         <InboxOutlined />
       </p>
       <p className="ant-upload-text">点击或拖拽 Logo 至此区域</p>
-      <p className="ant-upload-hint">支持 JPG / PNG / SVG，单张 ≤5MB</p>
+      <p className="ant-upload-hint">支持 JPG / PNG，单张 ≤5MB</p>
     </Upload.Dragger>
   )
 
   return (
-    <Spin spinning={loading} tip="处理中...">
+    <Spin spinning={loading}>
       {previewUrl ? preview : dragger}
     </Spin>
   )
