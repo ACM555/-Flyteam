@@ -1,5 +1,7 @@
 import request from './request'
 import type { UnifiedResponse } from '@/types/audit'
+import { demoAdminStatistics, demoAdminTaskDetail, demoAdminTasks } from '@/demo/data'
+import { resolvePresentationRead } from '@/demo/runtime'
 
 export interface AdminStatistics {
   auditedBrands: number
@@ -39,16 +41,22 @@ export interface AdminTaskDetail {
 }
 
 export async function getAdminStatistics(): Promise<AdminStatistics> {
-  const res = (await request.get('/admin/statistics')) as UnifiedResponse<AdminStatistics>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/admin/statistics')) as UnifiedResponse<AdminStatistics>
+    return res.data
+  }, demoAdminStatistics)
 }
 
 export async function getAdminTasks(): Promise<AdminTask[]> {
-  const res = (await request.get('/admin/tasks')) as UnifiedResponse<AdminTask[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/admin/tasks')) as UnifiedResponse<AdminTask[]>
+    return res.data
+  }, demoAdminTasks)
 }
 
 export async function getAdminTaskDetail(taskId: string): Promise<AdminTaskDetail> {
-  const res = (await request.get(`/admin/tasks/${taskId}`)) as UnifiedResponse<AdminTaskDetail>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get(`/admin/tasks/${taskId}`)) as UnifiedResponse<AdminTaskDetail>
+    return res.data
+  }, { ...demoAdminTaskDetail, task_id: taskId })
 }

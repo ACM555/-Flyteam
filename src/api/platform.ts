@@ -1,5 +1,7 @@
 import request from './request'
 import type { UnifiedResponse } from '@/types/audit'
+import { demoOverview, demoRules } from '@/demo/data'
+import { resolvePresentationRead } from '@/demo/runtime'
 
 export interface PlatformModule {
   key: string
@@ -44,11 +46,15 @@ export interface CountryRule {
 }
 
 export async function getPlatformOverview(): Promise<PlatformOverview> {
-  const res = (await request.get('/platform/overview')) as UnifiedResponse<PlatformOverview>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/platform/overview')) as UnifiedResponse<PlatformOverview>
+    return res.data
+  }, demoOverview)
 }
 
 export async function getCountryRules(): Promise<CountryRule[]> {
-  const res = (await request.get('/rules/countries')) as UnifiedResponse<CountryRule[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/rules/countries')) as UnifiedResponse<CountryRule[]>
+    return res.data
+  }, demoRules)
 }

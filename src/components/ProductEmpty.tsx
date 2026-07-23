@@ -1,11 +1,25 @@
-import { Empty, Typography } from 'antd'
+import { Button, Empty, Space, Typography } from 'antd'
 
-function ProductEmpty({ description = '暂无数据，完成一次智能审查后将自动沉淀。' }: { description?: string }) {
+type ProductEmptyProps = {
+  description: string
+  detail?: string
+  actionLabel?: string
+  onAction?: () => void
+}
+
+function ProductEmpty({ description, detail, actionLabel, onAction }: ProductEmptyProps) {
   return (
     <Empty
-      description={<Typography.Text type="secondary">{description}</Typography.Text>}
+      className="product-empty"
+      description={
+        <Space direction="vertical" size={4}>
+          <Typography.Text strong>{description}</Typography.Text>
+          {detail && <Typography.Text type="secondary">{detail}</Typography.Text>}
+          {actionLabel && onAction && <Button type="primary" onClick={onAction}>{actionLabel}</Button>}
+        </Space>
+      }
       image="/assets/illustrations/empty-intel.svg"
-      styles={{ image: { height: 150 } }}
+      styles={{ image: { height: 112 } }}
     />
   )
 }

@@ -1,408 +1,82 @@
-import {
-  AlertOutlined,
-  ArrowRightOutlined,
-  AuditOutlined,
-  BankOutlined,
-  CheckCircleOutlined,
-  CloudServerOutlined,
-  DatabaseOutlined,
-  FileProtectOutlined,
-  FileTextOutlined,
-  GlobalOutlined,
-  MonitorOutlined,
-  SafetyCertificateOutlined,
-  SendOutlined,
-  ThunderboltOutlined,
-} from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Divider,
-  List,
-  Row,
-  Skeleton,
-  Space,
-  Statistic,
-  Tag,
-  Typography,
-} from 'antd'
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { AlertOutlined, ArrowRightOutlined, DatabaseOutlined, FileTextOutlined, ReloadOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Skeleton, Table, Typography } from 'antd'
+import type { TableColumnsType } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { HoverLift, MotionItem, StaggerGroup } from '@/components/MotionKit'
-import ProductEmpty from '@/components/ProductEmpty'
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { getPlatformOverview, type PlatformOverview } from '@/api/platform'
-import { getBrandAssets, getDataSourceStatus, getMonitoringAlerts } from '@/api/saas'
-import type { BrandAsset, DataSourceStatus, MonitoringAlert } from '@/api/saas'
+import { getBrandAssets, getDataSourceStatus, getMonitoringAlerts, getReports, type BrandAsset, type DataSourceStatus, type MonitoringAlert, type ReportRecord } from '@/api/saas'
+import { MetricCard, RiskBadge, SourceStatus } from '@/components/DesignSystem'
+import { ChartReveal, MotionItem, StaggerGroup } from '@/components/MotionKit'
+import RiskRadar from '@/components/RiskRadar'
 
-const { Paragraph, Text, Title } = Typography
-
-const fallbackOverview: PlatformOverview = {
-  positioning: '面向中国企业赴越南与东盟市场的商标合规智能体',
-  slogan: '注册前预检、注册中导航、注册后风控',
-  healthScore: 86,
-  riskTrend: [],
-  modules: [],
-  dataSources: [],
-  sla: [],
-  businessModel: [],
-}
-
-const riskColor = {
-  high: 'red',
-  medium: 'orange',
-  low: 'green',
-} as const
-
-const moduleIcons = [
-  <AuditOutlined />,
-  <FileProtectOutlined />,
-  <GlobalOutlined />,
-  <ThunderboltOutlined />,
-  <AlertOutlined />,
-  <FileTextOutlined />,
-]
-
-const quickActions = [
-  {
-    desc: '上传品牌名、类别、Logo，一次生成风险结论',
-    icon: <SendOutlined />,
-    path: '/submit',
-    title: '发起智能审查',
-  },
-  {
-    desc: '查看品牌组合、风险等级和下一步动作',
-    icon: <SafetyCertificateOutlined />,
-    path: '/assets',
-    title: '品牌资产库',
-  },
-  {
-    desc: '订阅公告期异议、抢注与法规变更信号',
-    icon: <MonitorOutlined />,
-    path: '/monitoring',
-    title: '监控预警',
-  },
-  {
-    desc: '进入运营后台，查看任务和系统运行状态',
-    icon: <BankOutlined />,
-    path: '/admin',
-    title: '后台管理',
-  },
-]
-
-const portalNews = [
-  {
-    date: '07-19',
-    tag: '规则动态',
-    title: '越南公告期异议窗口进入高发周期，茶饮与餐饮服务建议提前准备证据链',
-  },
-  {
-    date: '07-18',
-    tag: '能力升级',
-    title: 'M2 驰名/跨类保护模型加入权利族聚类，提升国际品牌冲突识别能力',
-  },
-  {
-    date: '07-18',
-    tag: '数据源',
-    title: 'WIPO、TMview、NOIP 与本地规则库完成统一健康度监控',
-  },
-  {
-    date: '07-17',
-    tag: '实务策略',
-    title: '三国以上市场推荐“基础标 + 单国/马德里混合路径”降低申请成本',
-  },
-]
-
-const strategyCards = [
-  {
-    cover: '/assets/photos/china-business-meeting.webp',
-    kicker: '媒体东大式栏目',
-    path: '/reports',
-    title: '报告中心',
-    text: '沉淀可复用、可归档、可交付的中英越文审查报告与代理人协作清单。',
-  },
-  {
-    cover: '/assets/photos/china-city-data.webp',
-    kicker: '学术东大式栏目',
-    path: '/rules',
-    title: '国家规则库',
-    text: '按越南、泰国、印尼、马来西亚等市场组织禁用条款、周期和提交策略。',
-  },
-  {
-    cover: '/assets/photos/china-court-office.webp',
-    kicker: '活力东大式栏目',
-    path: '/assets',
-    title: '品牌运营视图',
-    text: '把品牌资产、监控事件和注册阶段打通，给评委看到完整业务闭环。',
-  },
-]
-
-function formatAlertMeta(item: MonitoringAlert) {
-  return `${item.country} · ${item.window} · ${item.owner}`
-}
-
-function handleCardKey(event: KeyboardEvent<HTMLElement>, action: () => void) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    action()
-  }
-}
+const emptyOverview: PlatformOverview = { positioning: '', slogan: '', modules: [], dataSources: [], riskTrend: [], sla: [], businessModel: [] }
 
 function Home() {
   const navigate = useNavigate()
-  const [overview, setOverview] = useState<PlatformOverview>(fallbackOverview)
+  const [overview, setOverview] = useState<PlatformOverview>(emptyOverview)
   const [assets, setAssets] = useState<BrandAsset[]>([])
   const [alerts, setAlerts] = useState<MonitoringAlert[]>([])
   const [sources, setSources] = useState<DataSourceStatus[]>([])
+  const [reports, setReports] = useState<ReportRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    let mounted = true
-
-    Promise.all([
-      getPlatformOverview(),
-      getBrandAssets(),
-      getMonitoringAlerts(),
-      getDataSourceStatus(),
-    ])
-      .then(([nextOverview, nextAssets, nextAlerts, nextSources]) => {
-        if (mounted) {
-          setOverview(nextOverview)
-          setAssets(nextAssets)
-          setAlerts(nextAlerts)
-          setSources(nextSources)
-          setError(false)
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setError(true)
-        }
-      })
-      .finally(() => {
-        if (mounted) {
-          setLoading(false)
-        }
-      })
-
-    return () => {
-      mounted = false
-    }
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [nextOverview, nextAssets, nextAlerts, nextSources, nextReports] = await Promise.all([getPlatformOverview(), getBrandAssets(), getMonitoringAlerts(), getDataSourceStatus(), getReports()])
+      setOverview(nextOverview); setAssets(nextAssets); setAlerts(nextAlerts); setSources(nextSources); setReports(nextReports); setFailed(false)
+    } catch { setFailed(true) } finally { setLoading(false) }
   }, [])
+  useEffect(() => { void load() }, [load])
 
   const highRiskAssets = assets.filter((item) => item.riskLevel === 'high').length
   const highAlerts = alerts.filter((item) => item.severity === 'high').length
-  const featuredAlert = alerts[0]
-  const moduleRows = useMemo(() => overview.modules.slice(0, 6), [overview.modules])
+  const onlineSources = sources.filter((item) => item.status === 'online').length
+  const alertColumns: TableColumnsType<MonitoringAlert> = [
+    { title: '风险', dataIndex: 'severity', width: 110, render: (level) => <RiskBadge level={level} /> },
+    { title: '预警事项', dataIndex: 'title', render: (value, record) => <div><strong className="table-primary">{value}</strong><span className="table-secondary">{record.brandName} · {record.country}</span></div> },
+    { title: '处理窗口', dataIndex: 'window', width: 120 },
+    { title: '负责人', dataIndex: 'owner', width: 120 },
+  ]
 
   return (
-    <Space direction="vertical" size={30} style={{ display: 'flex' }}>
-      <section className="seu-hero portal-hero-cn">
-        <div className="hero-scanline" aria-hidden="true" />
-        <div className="hero-particles" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <span />
+    <div className="page-stack home-page">
+      <section className="home-hero">
+        <div className="home-hero-grid" aria-hidden="true" />
+        <div className="home-hero-copy">
+          <span className="home-hero-kicker">中国企业出海 · 东盟六国合规</span>
+          <Typography.Title level={1}>东盟商标风险<br />企业法务驾驶舱</Typography.Title>
+          <Typography.Paragraph>{overview.positioning || '将商标预检、注册导航、公告监控与证据报告集中到一个可追踪的决策空间。'}</Typography.Paragraph>
+          <div className="home-hero-actions"><Button icon={<SendOutlined />} onClick={() => navigate('/submit')} size="large" type="primary">发起智能审查</Button><Button className="home-hero-secondary" onClick={() => navigate('/reports')} size="large">查看管理层报告</Button></div>
+          <div className="hero-proof"><span><strong>6 国</strong>东盟核心市场</span><span><strong>4 类</strong>可信数据来源</span><span><strong>7×24</strong>公告期监控</span><span><strong>1 份</strong>证据链报告</span></div>
         </div>
-
-        <div className="seu-hero-content">
-          <Tag className="seu-hero-tag">中国企业出海 · 东盟商标合规智能体</Tag>
-          <Title level={1}>东盟商标合规智能体</Title>
-          <Paragraph>
-            {overview.positioning}，覆盖{overview.slogan}。用 AI 检索、法律规则和证据链报告，
-            帮中国品牌把出海前的商标风险提前看清楚、讲明白、留得住。
-          </Paragraph>
-          <Space className="seu-hero-actions" size={12} wrap>
-            <Button icon={<ArrowRightOutlined />} onClick={() => navigate('/submit')} size="large" type="primary">
-              发起智能审查
-            </Button>
-            <Button className="hero-secondary-btn" onClick={() => navigate('/reports')} size="large">
-              查看报告中心
-            </Button>
-          </Space>
-        </div>
-
-        <div className="seu-hero-board">
-          <Text className="board-kicker">LIVE RISK INDEX</Text>
-          <strong>{overview.healthScore ?? 86}</strong>
-          <span>平台健康度</span>
-          <Divider />
-          <Space direction="vertical" size={8}>
-            <Text>NOIP / WIPO / TMview 在线同步</Text>
-            <Text>高风险预警 {highAlerts} 条 · 资产库 {assets.length} 组</Text>
-          </Space>
-        </div>
+        <div className="risk-radar-panel"><RiskRadar score={overview.healthScore ?? 92} subtitle="平台健康度与实时风险信号" /></div>
       </section>
 
-      {error ? (
-        <Alert
-          showIcon
-          type="warning"
-          message="部分平台数据暂时不可用"
-          description="请确认后端服务已启动。当前页面保留门户展示，不影响继续发起审查。"
-        />
-      ) : null}
-
-      <section className="seu-quick-section">
-        <StaggerGroup>
-          <Row gutter={[16, 16]}>
-            {quickActions.map((item) => (
-              <Col key={item.path} xs={24} sm={12} xl={6}>
-                <MotionItem>
-                  <HoverLift>
-                    <Card
-                      className="seu-quick-card"
-                      onClick={() => navigate(item.path)}
-                      onKeyDown={(event) => handleCardKey(event, () => navigate(item.path))}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="quick-icon">{item.icon}</div>
-                      <Title level={4}>{item.title}</Title>
-                      <Paragraph>{item.desc}</Paragraph>
-                    </Card>
-                  </HoverLift>
-                </MotionItem>
-              </Col>
-            ))}
-          </Row>
+      {failed ? <Alert action={<Button icon={<ReloadOutlined />} onClick={load}>重新加载</Button>} message="部分数据暂时不可用" description="系统已保留可演示的只读业务数据，不影响浏览产品主流程。" showIcon type="warning" /> : null}
+      {loading ? <Card><Skeleton active paragraph={{ rows: 10 }} /></Card> : <>
+        <StaggerGroup className="metric-grid">
+          <MotionItem><MetricCard icon={<SafetyCertificateOutlined />} label="受管品牌资产" value={assets.length} unit="组" note="统一管理类别、国家与审查状态" /></MotionItem>
+          <MotionItem><MetricCard icon={<AlertOutlined />} label="高风险待办" value={highRiskAssets + highAlerts} unit="项" note="需在异议窗口内完成人工处置" tone="danger" /></MotionItem>
+          <MotionItem><MetricCard icon={<FileTextOutlined />} label="归档审查报告" value={reports.length} unit="份" note="包含法律依据与可追溯证据" tone="warning" /></MotionItem>
+          <MotionItem><MetricCard icon={<DatabaseOutlined />} label="在线数据来源" value={onlineSources} unit={`/${sources.length || 4}`} note="NOIP、WIPO、TMview 持续同步" tone="success" /></MotionItem>
         </StaggerGroup>
-      </section>
 
-      <section className="seu-news-section">
-        <div className="section-titlebar seu-titlebar">
-          <div>
-            <Text className="section-kicker">Risk Headlines</Text>
-            <Title level={2}>风控要闻</Title>
-          </div>
-          <Button type="link" onClick={() => navigate('/monitoring')}>
-            更多预警
-          </Button>
-        </div>
-
-        <Row gutter={[20, 20]}>
-          <Col xs={24} xl={11}>
-            <Card className="seu-feature-news">
-              <Tag color={featuredAlert ? riskColor[featuredAlert.severity] : 'red'}>重点预警</Tag>
-              <Title level={3}>{featuredAlert?.title ?? '越南公告期近似商标风险持续升温'}</Title>
-              <Paragraph>
-                {featuredAlert
-                  ? `${formatAlertMeta(featuredAlert)}。建议立即完成证据链归档、图形改稿和代理人协作准备。`
-                  : '系统会把公告期抢注、异议窗口和国际权利族信号整理为可执行动作，适合比赛现场演示。'}
-              </Paragraph>
-              <Button ghost onClick={() => navigate('/monitoring')}>
-                查看处置建议
-              </Button>
-            </Card>
-          </Col>
-          <Col xs={24} xl={13}>
-            <Card className="seu-news-list-card">
-              <List
-                dataSource={portalNews}
-                renderItem={(item) => (
-                  <List.Item className="seu-news-item">
-                    <div className="news-date">{item.date}</div>
-                    <div>
-                      <Tag color="blue">{item.tag}</Tag>
-                      <Text strong>{item.title}</Text>
-                    </div>
-                  </List.Item>
-                )}
-              />
-            </Card>
-          </Col>
-        </Row>
-      </section>
-
-      <section className="portal-section seu-capability-section">
-        <div className="section-titlebar seu-titlebar">
-          <div>
-            <Text className="section-kicker">Capability Columns</Text>
-            <Title level={2}>M1-M6 能力栏目</Title>
-          </div>
-          <Tag color="green">六大模块已接入演示链路</Tag>
-        </div>
-        {loading ? (
-          <Card>
-            <Skeleton active paragraph={{ rows: 8 }} />
+        <div className="dashboard-grid">
+          <Card className="chart-card" title="近七日风险趋势" extra={<span className="live-indicator"><span className="live-indicator-dot" />每 15 分钟更新</span>}>
+            <ChartReveal className="chart-frame"><ResponsiveContainer width="100%" height={250}><AreaChart data={overview.riskTrend || []}><defs><linearGradient id="highFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#b42332" stopOpacity={0.28}/><stop offset="95%" stopColor="#b42332" stopOpacity={0}/></linearGradient><linearGradient id="mediumFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#c69a44" stopOpacity={0.26}/><stop offset="95%" stopColor="#c69a44" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#e5ebf2" strokeDasharray="3 3" vertical={false}/><XAxis dataKey="date" tickLine={false}/><YAxis tickLine={false}/><Tooltip/><Area dataKey="high" fill="url(#highFill)" isAnimationActive={false} name="高风险" stroke="#b42332" strokeWidth={2}/><Area dataKey="medium" fill="url(#mediumFill)" isAnimationActive={false} name="中风险" stroke="#c69a44" strokeWidth={2}/></AreaChart></ResponsiveContainer></ChartReveal>
           </Card>
-        ) : moduleRows.length ? (
-          <Row gutter={[18, 18]}>
-            {moduleRows.map((item, index) => (
-              <Col key={item.key} xs={24} md={12} xl={8}>
-                <HoverLift>
-                  <Card className="seu-channel-card">
-                    <div className="channel-index">{String(index + 1).padStart(2, '0')}</div>
-                    <div className="channel-icon">{moduleIcons[index] ?? <CheckCircleOutlined />}</div>
-                    <Text className="channel-key">{item.key}</Text>
-                    <Title level={4}>{item.name}</Title>
-                    <Paragraph>{item.output}</Paragraph>
-                    <Space size={[6, 6]} wrap>
-                      {item.features.slice(0, 4).map((feature) => (
-                        <Tag key={feature}>{feature}</Tag>
-                      ))}
-                    </Space>
-                  </Card>
-                </HoverLift>
-              </Col>
-            ))}
-          </Row>
-        ) : (
-          <ProductEmpty description="暂无模块数据" />
-        )}
-      </section>
-
-      <Row gutter={[20, 20]}>
-        {strategyCards.map((item) => (
-          <Col key={item.title} xs={24} lg={8}>
-            <Card
-              className="seu-image-channel"
-              cover={<img alt={item.title} loading="lazy" src={item.cover} />}
-              onClick={() => navigate(item.path)}
-              onKeyDown={(event) => handleCardKey(event, () => navigate(item.path))}
-              role="button"
-              tabIndex={0}
-            >
-              <Text className="section-kicker">{item.kicker}</Text>
-              <Title level={4}>{item.title}</Title>
-              <Paragraph>{item.text}</Paragraph>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <section className="seu-data-band">
-        <div>
-          <Text className="section-kicker">Digital Platform</Text>
-          <Title level={2}>数字平台</Title>
-          <Paragraph>把规则、审查、报告、预警和后台运营集中到一套可展示、可测试、可上线的比赛产品里。</Paragraph>
+          <section className="coverage-board"><span className="page-eyebrow">区域合规覆盖</span><h3>东盟六国规则已接入</h3><p>按市场查看法律依据、审查周期、风险标签与推荐注册路径。</p><div className="country-cloud">{['越南', '泰国', '印度尼西亚', '马来西亚', '菲律宾', '新加坡'].map((country, index) => <button className="country-node" key={country} onClick={() => navigate('/rules')} type="button"><strong>{country}</strong><span>{index < 2 ? '重点市场 · 实时规则' : '规则库已同步'}</span></button>)}</div><Button className="coverage-action" onClick={() => navigate('/rules')}>打开规则对比<ArrowRightOutlined /></Button></section>
         </div>
-        <Row gutter={[18, 18]}>
-          <Col xs={12} lg={6}>
-            <Statistic title="品牌资产" value={assets.length} suffix="组" prefix={<SafetyCertificateOutlined />} />
-          </Col>
-          <Col xs={12} lg={6}>
-            <Statistic title="高风险资产" value={highRiskAssets} suffix="组" prefix={<FileProtectOutlined />} />
-          </Col>
-          <Col xs={12} lg={6}>
-            <Statistic title="活跃预警" value={alerts.length} suffix="条" prefix={<AlertOutlined />} />
-          </Col>
-          <Col xs={12} lg={6}>
-            <Statistic title="数据源" value={sources.length || overview.dataSources.length} suffix="路" prefix={<DatabaseOutlined />} />
-          </Col>
-        </Row>
-        <div className="seu-data-sources">
-          {(sources.length ? sources : overview.dataSources).slice(0, 4).map((item) => (
-            <Tag key={typeof item === 'string' ? item : item.name} icon={<CloudServerOutlined />}>
-              {typeof item === 'string' ? item : `${item.name} · ${item.freshness}`}
-            </Tag>
-          ))}
-        </div>
-      </section>
-    </Space>
+
+        <Card className="data-table-card" title="待处理风险队列" extra={<Button type="link" onClick={() => navigate('/monitoring')}>进入监控中心<ArrowRightOutlined /></Button>}>
+          <Table columns={alertColumns} dataSource={alerts} pagination={false} rowKey="alertId" scroll={{ x: 760 }} onRow={() => ({ onClick: () => navigate('/monitoring'), style: { cursor: 'pointer' } })} />
+        </Card>
+        <section><div className="section-titlebar"><div><h3>可信数据源健康度</h3><span className="section-meta">所有结论均标记来源与同步时间</span></div><Button icon={<ReloadOutlined />} onClick={load}>刷新状态</Button></div><div className="source-grid source-grid-spaced">{sources.map((source) => <SourceStatus key={source.name} source={source} />)}</div></section>
+      </>}
+    </div>
   )
 }
 

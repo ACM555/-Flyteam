@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.services.display_utils import display_text, nice_class_label, squash_whitespace
 
 
 def _now() -> str:
@@ -165,6 +166,12 @@ def delete_session(token: str) -> None:
 
 def create_task(task_id: str, request_data: dict[str, Any]) -> None:
     timestamp = _now()
+    normalized_request = dict(request_data)
+    for field in ("brandName", "englishName", "goodsServices", "businessDescription"):
+        if field in normalized_request:
+            normalized_request[field] = squash_whitespace(normalized_request[field])
+    if "niceClass" in normalized_request:
+        normalized_request["niceClass"] = nice_class_label(normalized_request["niceClass"])
     with _connect() as connection:
         connection.execute(
             """
@@ -173,7 +180,7 @@ def create_task(task_id: str, request_data: dict[str, Any]) -> None:
                 result_json, error_message, created_at, updated_at
             ) VALUES (?, 'pending', 0, 0, ?, NULL, NULL, ?, ?)
             """,
-            (task_id, json.dumps(request_data, ensure_ascii=False), timestamp, timestamp),
+            (task_id, json.dumps(normalized_request, ensure_ascii=False), timestamp, timestamp),
         )
 
 
@@ -255,18 +262,22 @@ def list_audit_tasks(limit: int = 50) -> list[dict[str, Any]]:
     for row in rows:
         request = json.loads(row["request_json"])
         result = json.loads(row["result_json"]) if row["result_json"] else None
+        brand_name = (result or {}).get("brandName") or request.get("brandName", "")
+        nice_class = (result or {}).get("niceClass") or request.get("niceClass", "")
+        summary = (result or {}).get("overallResult") or request.get("goodsServices", "")
         tasks.append(
             {
                 "taskId": row["task_id"],
                 "status": row["status"],
                 "currentStep": row["current_step"],
                 "progress": row["progress"],
-                "brandName": request.get("brandName", ""),
-                "niceClass": request.get("niceClass", ""),
+                "brandName": display_text(brand_name, "品牌信息待补充"),
+                "niceClass": nice_class_label(nice_class, "类别待补充"),
                 "targetCountries": request.get("targetCountries", []),
                 "riskLevel": result.get("riskLevel") if result else "",
                 "riskScore": result.get("riskScore") if result else 0,
                 "manualReviewRequired": bool(result.get("manualReviewRequired")) if result else False,
+                "summary": display_text(summary, "审查摘要待生成"),
                 "createdAt": row["created_at"],
                 "updatedAt": row["updated_at"],
                 "errorMessage": row["error_message"] or "",

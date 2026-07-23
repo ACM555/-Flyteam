@@ -1,21 +1,11 @@
-import {
-  AlertOutlined,
-  ApiOutlined,
-  AppstoreOutlined,
-  BankOutlined,
-  DatabaseOutlined,
-  FileSearchOutlined,
-  FileTextOutlined,
-  HomeOutlined,
-  LogoutOutlined,
-  SendOutlined,
-  UserOutlined,
-} from '@ant-design/icons'
-import { Avatar, Badge, Button, Layout, Menu, Space, Tag, Typography } from 'antd'
+import { AlertOutlined, ApiOutlined, AppstoreOutlined, BankOutlined, DatabaseOutlined, FileSearchOutlined, FileTextOutlined, HomeOutlined, LogoutOutlined, MenuOutlined, SendOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Button, Drawer, Layout, Menu, Space, Tag, Typography } from 'antd'
 import type { MenuProps } from 'antd'
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
 import { PageTransition } from '@/components/MotionKit'
+import { useAuth } from '@/context/AuthContext'
+import { usePresentation } from '@/context/PresentationContext'
 
 const { Content, Header, Sider } = Layout
 
@@ -30,86 +20,66 @@ function selectedKey(pathname: string) {
   return '/'
 }
 
+function BrandBlock() {
+  return <div className="brand-block"><img alt="东盟商标合规智能体" className="brand-mark-img" src="/assets/brand/outbound-guard-mark.svg" /><div className="brand-copy"><span className="brand-title">东盟商标合规智能体</span><span className="brand-subtitle">OUTBOUND GUARD · 企业法务驾驶舱</span></div></div>
+}
+
+const baseNavigation: Exclude<MenuProps['items'], undefined> = [
+  { key: '/', icon: <HomeOutlined />, label: '风险工作台' },
+  { key: '/assets', icon: <AppstoreOutlined />, label: '品牌资产库' },
+  { key: '/submit', icon: <SendOutlined />, label: '智能审查' },
+  { key: '/reviewing', icon: <FileSearchOutlined />, label: '审查进度' },
+  { key: '/reports', icon: <FileTextOutlined />, label: '报告中心' },
+  { key: '/monitoring', icon: <AlertOutlined />, label: '监控预警' },
+  { key: '/rules', icon: <DatabaseOutlined />, label: '东盟规则库' },
+]
+
 function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { isAuthenticated, isAdmin, logout, user } = useAuth()
+  const { mode, exitPresentation } = usePresentation()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const menuItems: MenuProps['items'] = [...baseNavigation, ...(isAdmin ? [{ key: '/admin', icon: <BankOutlined />, label: '后台管理' }] : [])]
 
-  const navigationItems: MenuProps['items'] = [
-    { key: '/', icon: <HomeOutlined />, label: '风险工作台' },
-    { key: '/assets', icon: <AppstoreOutlined />, label: '品牌资产' },
-    { key: '/submit', icon: <SendOutlined />, label: '智能审查' },
-    { key: '/reviewing', icon: <FileSearchOutlined />, label: '审查进度' },
-    { key: '/reports', icon: <FileTextOutlined />, label: '报告中心' },
-    { key: '/monitoring', icon: <AlertOutlined />, label: '监控预警' },
-    { key: '/rules', icon: <DatabaseOutlined />, label: '规则库' },
-    ...(isAdmin ? [{ key: '/admin', icon: <BankOutlined />, label: '后台管理' }] : []),
-  ]
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
+  const go = (key: string) => { navigate(key); setMobileNavOpen(false) }
+  const handleLogout = async () => { await logout(); navigate('/login', { replace: true }) }
+  const leavePresentation = () => {
+    exitPresentation()
+    if (mode === 'demo') navigate('/login', { replace: true })
+    else window.location.reload()
   }
 
+  const statusLabel = mode === 'demo' ? '比赛演示空间' : '演示数据兜底'
   return (
     <Layout className="app-shell">
-      <div className="aurora-layer" aria-hidden="true" />
-      <div className="grid-layer" aria-hidden="true" />
-      <Sider className="app-sider" width={260} breakpoint="lg" collapsedWidth={0}>
-        <div className="brand-block">
-          <img alt="Outbound Guard" className="brand-mark-img" src="/assets/brand/outbound-guard-mark.svg" />
-          <div>
-            <Typography.Text strong>Outbound Guard</Typography.Text>
-            <Typography.Text type="secondary">Trademark Risk OS</Typography.Text>
-          </div>
-        </div>
-        <Menu
-          className="side-menu"
-          mode="inline"
-          items={navigationItems}
-          selectedKeys={[selectedKey(location.pathname)]}
-          onClick={({ key }) => navigate(key)}
-        />
-        <div className="side-status">
-          <Tag color="cyan">Live Product Mode</Tag>
-          <Typography.Paragraph>
-            覆盖注册前审查、组合资产管理、公告期监控、规则库和报告归档的完整产品闭环。
-          </Typography.Paragraph>
-        </div>
+      <Sider className="app-sider" width={248} breakpoint="lg" collapsedWidth={0} trigger={null}>
+        <BrandBlock />
+        <Menu aria-label="主导航" className="side-menu" mode="inline" items={menuItems} selectedKeys={[selectedKey(location.pathname)]} onClick={({ key }) => go(key)} />
+        <div className="side-status"><LiveStatus mode={mode} /><Typography.Paragraph>覆盖注册前预检、品牌资产管理、公告期监控和规则证据归档。</Typography.Paragraph></div>
       </Sider>
+      <Drawer className="mobile-nav-drawer" open={mobileNavOpen} placement="left" title={<BrandBlock />} onClose={() => setMobileNavOpen(false)} width={280} styles={{ body: { padding: 0, background: 'var(--navy-900)' } }}>
+        <Menu aria-label="主导航" className="side-menu" mode="inline" items={menuItems} selectedKeys={[selectedKey(location.pathname)]} onClick={({ key }) => go(key)} />
+      </Drawer>
       <Layout>
         <Header className="app-header">
-          <Space size={12}>
-            <Badge status="processing" text="FastAPI online" />
-            <Tag icon={<ApiOutlined />} color="geekblue">
-              ASEAN ruleset v2026.07
-            </Tag>
-          </Space>
-          <Space size={12} wrap>
-            <Button type="primary" onClick={() => navigate('/submit')}>
-              新建审查
-            </Button>
-            {isAuthenticated ? (
-              <>
-                <Typography.Text type="secondary">{user?.company || user?.username}</Typography.Text>
-                <Button aria-label="退出登录" icon={<LogoutOutlined />} onClick={handleLogout}>
-                  退出
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => navigate('/login')}>登录 / 注册</Button>
-            )}
+          <Button aria-label="打开导航" className="header-mobile-trigger" icon={<MenuOutlined />} onClick={() => setMobileNavOpen(true)} type="text" />
+          <Space className="header-desktop-meta" size={12}><span className="header-product-name">东盟商标合规工作台</span><Tag icon={<ApiOutlined />} className="header-source-tag">NOIP · WIPO · TMview 数据已接入</Tag></Space>
+          <Space size={10} wrap style={{ marginLeft: 'auto' }}>
+            {mode !== 'live' ? <button className="presentation-banner" data-mode={mode} onClick={leavePresentation} type="button"><span>{statusLabel}</span>退出</button> : null}
+            <Button onClick={() => navigate('/submit')} type="primary">新建审查</Button>
+            {isAuthenticated ? <><Typography.Text className="header-user-name" type="secondary">{user?.company || user?.username || '当前账户'}</Typography.Text><Button icon={<LogoutOutlined />} onClick={handleLogout}>退出</Button></> : <Button onClick={() => navigate('/login')}>登录</Button>}
             <Avatar icon={<UserOutlined />} />
           </Space>
         </Header>
-        <Content className="app-content">
-          <PageTransition>
-            <Outlet />
-          </PageTransition>
-        </Content>
+        <Content className="app-content"><div className="app-content-inner"><PageTransition><Outlet /></PageTransition></div></Content>
       </Layout>
     </Layout>
   )
+}
+
+function LiveStatus({ mode }: { mode: string }) {
+  return <span className={`side-live ${mode !== 'live' ? 'fallback' : ''}`}><span />{mode === 'live' ? '生产数据链路正常' : '当前为只读演示数据'}</span>
 }
 
 export default AppLayout

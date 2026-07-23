@@ -263,9 +263,9 @@ def get_platform_overview() -> dict[str, Any]:
         "dataSources": [item["name"] for item in DATA_SOURCE_STATUS],
         "sla": [
             {"name": "文本近似检索", "target": "<200ms", "status": "production-ready"},
-            {"name": "图形粗筛 + 精排", "target": "<2s", "status": "demo-ready"},
+            {"name": "图形粗筛 + 精排", "target": "<2s", "status": "review-required"},
             {"name": "规则引擎", "target": "<50ms", "status": "production-ready"},
-            {"name": "综合报告生成", "target": "<3s", "status": "demo-ready"},
+            {"name": "综合报告生成", "target": "<3s", "status": "review-required"},
         ],
         "businessModel": [
             {"name": "Starter", "price": "基础预检免费", "buyer": "跨境卖家"},
@@ -301,8 +301,8 @@ def build_report_center(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
             {
                 "reportId": f"RP-{task['taskId'][:8].upper()}",
                 "taskId": task["taskId"],
-                "brandName": task["brandName"] or "未命名品牌",
-                "niceClass": task["niceClass"] or "未选择类别",
+                "brandName": task["brandName"] or "品牌信息待补充",
+                "niceClass": task["niceClass"] or "类别待补充",
                 "targetCountries": task["targetCountries"],
                 "riskLevel": task["riskLevel"] or "low",
                 "riskScore": task["riskScore"] or 0,
@@ -311,27 +311,8 @@ def build_report_center(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "updatedAt": task["updatedAt"],
                 "owner": "当前团队",
                 "status": "已归档",
-                "summary": "包含文字近似、图形近似、绝对理由、跨类驰护、文化禁忌和注册路径建议。",
+                "summary": task["summary"] or "审查摘要待生成。",
             }
         )
 
-    if reports:
-        return reports
-
-    return [
-        {
-            "reportId": "RP-DEMO-001",
-            "taskId": "",
-            "brandName": "墨兰奶白",
-            "niceClass": "第43类-餐饮服务",
-            "targetCountries": ["越南", "泰国", "新加坡"],
-            "riskLevel": "high",
-            "riskScore": 87,
-            "manualReviewRequired": True,
-            "createdAt": "2026-07-18 21:40",
-            "updatedAt": "2026-07-18 21:43",
-            "owner": "比赛演示样例",
-            "status": "示例报告",
-            "summary": "演示用高风险报告，突出跨类驰名保护、四叶花图形冲突和越南纯汉字显著性风险。",
-        }
-    ]
+    return reports

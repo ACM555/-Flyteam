@@ -1,0 +1,59 @@
+* { box-sizing: border-box; }
+
+html {
+  background: var(--canvas);
+  min-width: 320px;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink-950);
+  font-family: var(--font-sans);
+  margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select { font: inherit; }
+
+button,
+a { touch-action: manipulation; }
+
+a { color: var(--info); }
+
+::selection { background: rgb(14 165 183 / 20%); }
+
+:focus-visible {
+  outline: 3px solid rgb(14 165 183 / 32%);
+  outline-offset: 2px;
+}
+
+.ant-typography { color: var(--ink-950); }
+.ant-typography-secondary { color: var(--ink-600); }
+.ant-btn { border-radius: var(--radius-sm); font-weight: 600; }
+.ant-btn-primary { box-shadow: 0 8px 18px rgb(122 0 25 / 18%); }
+.ant-tag { border-radius: var(--radius-xs); font-weight: 600; margin-inline-end: 0; }
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector,
+.ant-picker { border-radius: var(--radius-sm); }
+.ant-card { border-radius: var(--radius-md); }
+.ant-card .ant-card-head { min-height: 54px; }
+.ant-card .ant-card-head-title { color: var(--ink-950); font-weight: 700; }
+
+.skip-link {
+  background: var(--surface);
+  color: var(--navy-900);
+  left: 16px;
+  padding: 10px 16px;
+  position: fixed;
+  top: -80px;
+  z-index: 2000;
+}
+
+.skip-link:focus { top: 16px; }

@@ -4,7 +4,8 @@ import { App as AntdApp, ConfigProvider } from 'antd'
 import 'antd/dist/reset.css'
 import App from '@/App'
 import { AuthProvider } from '@/context/AuthContext'
-import '@/styles.css'
+import { PresentationProvider } from '@/context/PresentationContext'
+import '@/styles/index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -19,7 +20,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           colorBgBase: '#f5f7fb',
           colorTextBase: '#102033',
           colorBorder: '#d8e0ea',
-          borderRadius: 12,
+          borderRadius: 8,
           boxShadow: '0 16px 42px rgba(15, 23, 42, 0.08)',
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -46,9 +47,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       }}
     >
       <AntdApp>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <PresentationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </PresentationProvider>
       </AntdApp>
     </ConfigProvider>
   </React.StrictMode>,

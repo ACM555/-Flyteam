@@ -1,5 +1,7 @@
 import request from './request'
 import type { UnifiedResponse } from '@/types/audit'
+import { demoAlerts, demoAssets, demoReports, demoSources } from '@/demo/data'
+import { resolvePresentationRead } from '@/demo/runtime'
 
 export type RiskLevel = 'high' | 'medium' | 'low'
 
@@ -58,21 +60,29 @@ export interface ReportRecord {
 }
 
 export async function getBrandAssets(): Promise<BrandAsset[]> {
-  const res = (await request.get('/brands')) as UnifiedResponse<BrandAsset[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/brands')) as UnifiedResponse<BrandAsset[]>
+    return res.data
+  }, demoAssets)
 }
 
 export async function getMonitoringAlerts(): Promise<MonitoringAlert[]> {
-  const res = (await request.get('/monitoring/alerts')) as UnifiedResponse<MonitoringAlert[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/monitoring/alerts')) as UnifiedResponse<MonitoringAlert[]>
+    return res.data
+  }, demoAlerts)
 }
 
 export async function getDataSourceStatus(): Promise<DataSourceStatus[]> {
-  const res = (await request.get('/data-sources/status')) as UnifiedResponse<DataSourceStatus[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/data-sources/status')) as UnifiedResponse<DataSourceStatus[]>
+    return res.data
+  }, demoSources)
 }
 
 export async function getReports(): Promise<ReportRecord[]> {
-  const res = (await request.get('/reports')) as UnifiedResponse<ReportRecord[]>
-  return res.data
+  return resolvePresentationRead(async () => {
+    const res = (await request.get('/reports')) as UnifiedResponse<ReportRecord[]>
+    return res.data
+  }, demoReports)
 }

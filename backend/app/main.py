@@ -28,6 +28,7 @@ from app.database import (
 )
 from app.models import AuditRequest, LoginRequest, RegisterRequest
 from app.services.audit_service import process_audit_task
+from app.services.display_utils import display_text, nice_class_label
 from app.services.pdf_service import build_audit_pdf
 from app.services.platform_service import (
     build_report_center,
@@ -247,9 +248,9 @@ def audit_result(task_id: str) -> dict:
             "currentStep": task["current_step"],
             "progress": task["progress"],
             "errorMessage": task["error_message"],
-            "brandName": request["brandName"],
-            "niceClass": request["niceClass"],
-            "goodsServices": request["goodsServices"],
+            "brandName": display_text(request["brandName"], "品牌信息待补充"),
+            "niceClass": nice_class_label(request["niceClass"], "类别待补充"),
+            "goodsServices": display_text(request["goodsServices"], "商品或服务描述待补充"),
         }
     )
 

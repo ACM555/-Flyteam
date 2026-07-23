@@ -39,6 +39,17 @@ export interface LegalReference {
   registrationNo: string
   summary: string
   relevance: string
+  sourceUrl?: string
+  retrievedAt?: string
+}
+
+export interface EvidenceItem {
+  title: string
+  summary: string
+  basis: 'rule' | 'evidence' | 'heuristic'
+  source: string
+  retrievedAt: string
+  sourceUrl?: string
 }
 
 export interface AuditResult {
@@ -54,11 +65,14 @@ export interface AuditResult {
   riskScore: number
   overallResult: string
   manualReviewRequired: boolean
+  generatedAt?: string
   hitRules: HitRule[]
   references: LegalReference[]
+  evidence: EvidenceItem[]
   summary: {
     brandName: string
     niceClass: string
+    submitTime?: string
     riskLevel: 'high' | 'medium' | 'low'
     riskScore: number
     overallResult: string

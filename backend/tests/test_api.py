@@ -129,6 +129,9 @@ def test_high_risk_audit_and_pdf() -> None:
         assert result["intelligence"]["crossClassShield"]["triggered"] is True
         assert result["intelligence"]["refusalHistory"]["triggered"] is True
         assert result["intelligence"]["culturalReview"]["triggered"] is True
+        assert result["generatedAt"]
+        assert result["evidence"]
+        assert {"title", "basis", "source", "retrievedAt"}.issubset(result["evidence"][0])
         assert result["advice"]["documentDownloadUrl"].endswith(f"/{task_id}/pdf")
 
         pdf = client.get(f"/api/audit/report/{task_id}/pdf")

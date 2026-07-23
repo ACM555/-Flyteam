@@ -3,182 +3,110 @@ import type {
   AuditRequest,
   AuditResponse,
   AuditResult,
+  EvidenceItem,
   HitRule,
   LegalReference,
   UnifiedResponse,
 } from '@/types/audit'
+import { demoAuditResult } from '@/demo/data'
+import { getPresentationMode, resolvePresentationRead, resolvePresentationWrite } from '@/demo/runtime'
 
 export async function audit(data: AuditRequest): Promise<AuditResponse> {
-  const serviceDescription = data.goodsServices || data.businessDescription || ''
-  const payload = {
-    ...data,
-    goodsServices: serviceDescription,
-    businessDescription: serviceDescription,
-  }
-  const res = await request.post('/audit', payload)
-  return res as unknown as AuditResponse
+  const goodsServices = data.goodsServices || data.businessDescription || ''
+  return resolvePresentationWrite(
+    async () => (await request.post('/audit', { ...data, goodsServices, businessDescription: goodsServices })) as AuditResponse,
+    { code: 0, message: '演示任务已创建', data: { taskId: 'demo-high-risk' } },
+  )
 }
 
 export async function getAuditResult(taskId: string): Promise<AuditResult> {
-  const res = (await request.get(`/audit/result/${taskId}`)) as UnifiedResponse<RawAuditResult>
-  return normalizeAuditResult(res.data)
-}
-
-type RawHitRule = Partial<HitRule>
-
-type RawReference = Partial<LegalReference>
-
-type RawSuggestion = {
-  priority?: 'P0' | 'P1' | 'P2'
-  title?: string
-  description?: string
+  if (getPresentationMode() !== 'live') return structuredClone({ ...demoAuditResult, taskId })
+  return resolvePresentationRead(async () => {
+    const response = (await request.get(`/audit/result/${taskId}`)) as UnifiedResponse<RawAuditResult>
+    return normalizeAuditResult(response.data)
+  }, { ...demoAuditResult, taskId })
 }
 
 type RawAuditResult = Partial<AuditResult> & {
-  brandName?: string
-  niceClass?: string
-  goodsServices?: string
-  riskLevel?: 'high' | 'medium' | 'low'
-  riskScore?: number
-  overallResult?: string
-  manualReviewRequired?: boolean
-  errorMessage?: string
-  hitRules?: RawHitRule[]
-  references?: RawReference[]
-  suggestions?: RawSuggestion[]
+  suggestions?: AuditResult['advice']['recommendations']
   radarData?: AuditResult['visual']['radarData']
   matchedBrands?: AuditResult['visual']['matchedBrands']
   documentPreview?: string
 }
 
-function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResult {
-  const safeRaw = raw ?? {}
-  const hitRules = safeRaw.hitRules ?? []
-  const references = safeRaw.references ?? []
-  const suggestions = safeRaw.suggestions ?? []
-  const absoluteRules = hitRules.filter((rule) => rule.ruleType === 'absolute')
-  const relativeRules = hitRules.filter((rule) => rule.ruleType === 'relative')
-  const trademarkReferences = references.filter((reference) => reference.refType === 'trademark')
-  const caseReferences = references.filter((reference) => reference.refType === 'case')
-  const brandName = safeRaw.brandName ?? safeRaw.summary?.brandName ?? ''
-  const niceClass = safeRaw.niceClass ?? safeRaw.summary?.niceClass ?? ''
-  const goodsServices = safeRaw.goodsServices ?? ''
-  const riskLevel = safeRaw.riskLevel ?? safeRaw.summary?.riskLevel ?? 'low'
-  const riskScore = safeRaw.riskScore ?? safeRaw.summary?.riskScore ?? 0
-  const overallResult = safeRaw.overallResult ?? safeRaw.summary?.overallResult ?? ''
-  const defaultIntelligence: AuditResult['intelligence'] = {
-    crossClassShield: {
-      triggered: false,
-      score: 0,
-      title: '跨类驰名保护扫描',
-      explanation: '当前任务尚未生成跨类驰名保护情报。',
-      protectedElements: [],
-      suggestedAction: '建议重新提交审查以生成新版情报报告。',
-    },
-    refusalHistory: {
-      triggered: false,
-      title: '驳回前科红牌',
-      explanation: '当前任务尚未生成驳回前科情报。',
-      redFlags: [],
-      evidence: [],
-    },
-    culturalReview: {
-      triggered: false,
-      title: '文化禁忌审查',
-      country: '越南',
-      rules: [],
-    },
-    registrationStrategy: {
-      route: '越南单国申请优先',
-      rationale: '当前任务尚未生成完整注册策略。',
-      marketCount: 1,
-      timeline: [],
-      costNotes: [],
-    },
-    monitoring: [],
-  }
-  const normalizedHitRules = hitRules.map((rule): HitRule => ({
+const defaultIntelligence: AuditResult['intelligence'] = {
+  crossClassShield: { triggered: false, score: 0, title: '跨类保护扫描', explanation: '等待审查结果。', protectedElements: [], suggestedAction: '完成审查后查看建议。' },
+  refusalHistory: { triggered: false, title: '历史风险信号', explanation: '等待审查结果。', redFlags: [], evidence: [] },
+  culturalReview: { triggered: false, title: '文化禁忌审查', country: '待确认', rules: [] },
+  registrationStrategy: { route: '待生成', rationale: '审查完成后生成推荐路径。', marketCount: 0, timeline: [], costNotes: [] },
+  monitoring: [],
+}
+
+function displayText(value: unknown, fallback: string) {
+  const text = String(value ?? '').trim()
+  return /[\p{L}\p{N}]/u.test(text) ? text : fallback
+}
+
+function normalizeRule(rule: Partial<HitRule>): HitRule {
+  return {
     ruleType: rule.ruleType ?? 'absolute',
-    article: rule.article ?? '未命名法条',
-    content: rule.content ?? '',
+    article: displayText(rule.article, '未命名规则'),
+    content: displayText(rule.content, '未提供规则说明。'),
     applicable: Boolean(rule.applicable),
     similarityType: rule.similarityType ?? '',
     similarityScore: rule.similarityScore ?? 0,
-    note: rule.note ?? '',
-  }))
-  const normalizedReferences = references.map((reference): LegalReference => ({
+    note: displayText(rule.note, '暂无补充说明。'),
+  }
+}
+
+function normalizeReference(reference: Partial<LegalReference>): LegalReference {
+  return {
     refType: reference.refType ?? 'law',
-    title: reference.title ?? '未命名依据',
-    source: reference.source ?? '',
+    title: displayText(reference.title, '未命名依据'),
+    source: displayText(reference.source, '公开数据源'),
     date: reference.date ?? '',
     registrationNo: reference.registrationNo ?? '',
-    summary: reference.summary ?? '',
+    summary: displayText(reference.summary, '该来源用于支持本次风险判断。'),
     relevance: reference.relevance ?? '',
-  }))
+    sourceUrl: reference.sourceUrl,
+    retrievedAt: reference.retrievedAt,
+  }
+}
+
+function normalizeEvidence(item: Partial<EvidenceItem>): EvidenceItem {
+  const basis = item.basis === 'rule' || item.basis === 'heuristic' ? item.basis : 'evidence'
+  return {
+    title: displayText(item.title, '审查依据'),
+    summary: displayText(item.summary, '该依据用于支持本次风险判断。'),
+    basis,
+    source: displayText(item.source, '公开数据源'),
+    retrievedAt: item.retrievedAt ?? '',
+    sourceUrl: item.sourceUrl,
+  }
+}
+
+function normalizeAuditResult(raw: RawAuditResult | null | undefined): AuditResult {
+  const value = raw ?? {}
+  const hitRules = (value.hitRules ?? []).map(normalizeRule)
+  const references = (value.references ?? []).map(normalizeReference)
+  const brandName = displayText(value.brandName ?? value.summary?.brandName, '品牌信息待补充')
+  const niceClass = displayText(value.niceClass ?? value.summary?.niceClass, '类别待补充')
+  const riskLevel = value.riskLevel ?? value.summary?.riskLevel ?? 'low'
+  const riskScore = value.riskScore ?? value.summary?.riskScore ?? 0
+  const overallResult = displayText(value.overallResult ?? value.summary?.overallResult, '审查结论待生成。')
+  const absoluteRules = hitRules.filter((item) => item.ruleType === 'absolute')
+  const relativeRules = hitRules.filter((item) => item.ruleType === 'relative')
 
   return {
-    taskId: safeRaw.taskId ?? '',
-    status: safeRaw.status ?? 'pending',
-    currentStep: safeRaw.currentStep ?? 0,
-    progress: safeRaw.progress ?? 0,
-    errorMessage: safeRaw.errorMessage,
-    brandName,
-    niceClass,
-    goodsServices,
-    riskLevel,
-    riskScore,
-    overallResult,
-    manualReviewRequired: Boolean(safeRaw.manualReviewRequired),
-    hitRules: normalizedHitRules,
-    references: normalizedReferences,
-    summary: safeRaw.summary ?? {
-      brandName,
-      niceClass,
-      riskLevel,
-      riskScore,
-      overallResult,
-    },
-    absolute: safeRaw.absolute ?? {
-      hasRisk: absoluteRules.some((rule) => rule.applicable),
-      rejectionProbability:
-        absoluteRules.find((rule) => rule.applicable)?.similarityScore ??
-        Math.max(0, Math.round((safeRaw.riskScore ?? 0) * 0.35)),
-      articles: absoluteRules.map((rule) => ({
-        article: rule.article ?? '未命名法条',
-        content: rule.content ?? '',
-        applicable: Boolean(rule.applicable),
-        note: rule.note ?? '',
-      })),
-    },
-    relative: safeRaw.relative ?? {
-      hasRisk: relativeRules.some((rule) => rule.applicable),
-      conflicts: trademarkReferences.map((reference, index) => ({
-        brandName: reference.title ?? '未知冲突品牌',
-        registeredClass: reference.summary ?? '',
-        registrationNo: reference.registrationNo ?? `conflict-${index + 1}`,
-        similarityType: relativeRules[index]?.similarityType ?? relativeRules[0]?.similarityType ?? '',
-        similarityScore: relativeRules[index]?.similarityScore ?? relativeRules[0]?.similarityScore ?? 0,
-      })),
-      precedents: caseReferences.map((reference) => ({
-        caseName: reference.title ?? '未命名判例',
-        court: reference.source ?? '',
-        date: reference.date ?? '',
-        ruling: reference.summary ?? '',
-        relevance: reference.relevance ?? '',
-      })),
-    },
-    visual: safeRaw.visual ?? {
-      radarData: safeRaw.radarData ?? [],
-      matchedBrands: safeRaw.matchedBrands ?? [],
-    },
-    intelligence: safeRaw.intelligence ?? defaultIntelligence,
-    advice: safeRaw.advice ?? {
-      recommendations: suggestions.map((suggestion) => ({
-        priority: suggestion.priority ?? 'P2',
-        title: suggestion.title ?? '未命名建议',
-        description: suggestion.description ?? '',
-      })),
-      documentPreview: safeRaw.documentPreview ?? '',
-    },
+    taskId: value.taskId ?? '', status: value.status ?? 'pending', currentStep: value.currentStep ?? 0, progress: value.progress ?? 0,
+    errorMessage: value.errorMessage, brandName, niceClass, goodsServices: displayText(value.goodsServices, '商品或服务描述待补充'),
+    riskLevel, riskScore, overallResult, manualReviewRequired: Boolean(value.manualReviewRequired), generatedAt: value.generatedAt ?? value.summary?.submitTime,
+    hitRules, references, evidence: (value.evidence ?? []).map(normalizeEvidence),
+    summary: { brandName, niceClass, riskLevel, riskScore, overallResult },
+    absolute: value.absolute ?? { hasRisk: absoluteRules.some((item) => item.applicable), rejectionProbability: Math.round(riskScore * 0.35), articles: absoluteRules.map(({ article, content, applicable, note }) => ({ article, content, applicable, note })) },
+    relative: value.relative ?? { hasRisk: relativeRules.some((item) => item.applicable), conflicts: [], precedents: [] },
+    visual: value.visual ?? { radarData: value.radarData ?? [], matchedBrands: value.matchedBrands ?? [] },
+    intelligence: value.intelligence ?? defaultIntelligence,
+    advice: value.advice ?? { recommendations: value.suggestions ?? [], documentPreview: value.documentPreview ?? '' },
   }
 }

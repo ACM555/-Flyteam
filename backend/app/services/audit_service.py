@@ -8,6 +8,7 @@ from typing import Any
 from app.config import settings
 from app.database import get_task, update_task
 from app.services.legal_engine import assess_absolute_rules
+from app.services.display_utils import display_text, nice_class_label
 from app.services.trademark_service import find_text_conflicts, get_visual_benchmark_conflict
 from app.services.vision_service import analyze_logo
 
@@ -31,6 +32,57 @@ def _countries(request: dict[str, Any]) -> list[str]:
     countries = request.get("targetCountries") or ["越南"]
     return [str(country) for country in countries if str(country).strip()] or ["越南"]
 
+
+
+def _display_brand_name(value: object) -> str:
+    return display_text(value, "品牌信息待补充")
+
+
+def _display_goods_services(value: object) -> str:
+    return display_text(value, "商品或服务描述待补充")
+
+
+def _build_evidence(
+    hit_rules: list[dict[str, Any]],
+    references: list[dict[str, Any]],
+    visual_summary: str,
+    generated_at: str,
+) -> list[dict[str, str]]:
+    evidence: list[dict[str, str]] = []
+    for rule in hit_rules:
+        if not rule.get("applicable"):
+            continue
+        evidence.append(
+            {
+                "title": rule.get("article") or "规则命中",
+                "summary": rule.get("note") or rule.get("content") or "规则引擎检出风险信号。",
+                "basis": "rule",
+                "source": "商标合规规则引擎",
+                "retrievedAt": generated_at,
+            }
+        )
+    for reference in references:
+        evidence.append(
+            {
+                "title": reference.get("title") or "外部证据",
+                "summary": reference.get("summary") or reference.get("relevance") or "用于支持本次风险判断。",
+                "basis": "evidence",
+                "source": reference.get("source") or "公开数据源",
+                "retrievedAt": reference.get("retrievedAt") or generated_at,
+                "sourceUrl": reference.get("sourceUrl") or "",
+            }
+        )
+    if visual_summary:
+        evidence.append(
+            {
+                "title": "图形特征辅助判断",
+                "summary": visual_summary,
+                "basis": "heuristic",
+                "source": "图形特征分析模型",
+                "retrievedAt": generated_at,
+            }
+        )
+    return evidence
 
 def _build_cross_class_shield(conflicts: list[dict[str, Any]], requested_class: str) -> dict[str, Any]:
     well_known_conflicts = [item for item in conflicts if item.get("wellKnown")]
@@ -106,7 +158,7 @@ def _build_cultural_review(request: dict[str, Any], absolute_risk: bool) -> dict
                 {
                     "label": "先公告后实审",
                     "severity": "medium",
-                    "note": "越南存在约 5 个月公告异议窗口，参赛版会把该窗口纳入监控计划。",
+                    "note": "越南存在约 5 个月公告异议窗口，系统会把该窗口纳入监控计划。",
                 },
             ]
         )
@@ -265,7 +317,7 @@ def _document_preview(
 建议保留商标设计源文件、委托协议、版本记录、首次公开及商业使用证据。
 
 ## 五、重要声明
-本报告由公开数据和自动化规则生成，仅用于比赛演示与提交前风险筛查，不替代越南执业律师或商标代理人的正式法律意见。"""
+本报告由公开数据和自动化规则生成，仅用于提交前风险筛查，不替代越南执业律师或商标代理人的正式法律意见。"""
 
 
 def process_audit_task(task_id: str, image_path: Path) -> None:
@@ -324,6 +376,7 @@ def process_audit_task(task_id: str, image_path: Path) -> None:
                     f"{conflict['similarityType']}，评分 {conflict['similarityScore']}/100。"
                 ),
                 "sourceUrl": conflict.get("sourceUrl", ""),
+                "retrievedAt": datetime.now(UTC).isoformat(),
             }
             for conflict in conflicts
         )
@@ -384,25 +437,35 @@ def process_audit_task(task_id: str, image_path: Path) -> None:
             for conflict in conflicts
             if conflict["similarityType"].startswith("图形")
         ]
-        submit_time = datetime.now(UTC).isoformat()
+        generated_at = datetime.now(UTC).isoformat()
+        display_brand_name = _display_brand_name(request["brandName"])
+        display_nice_class = nice_class_label(request["niceClass"], "类别待补充")
+        display_goods_services = _display_goods_services(request["goodsServices"])
+        visual_summary = (
+            vision.model_analysis.get("summary")
+            if vision.model_analysis and vision.model_analysis.get("summary")
+            else vision.local_summary
+        )
         result = {
             "taskId": task_id,
             "status": "done",
             "currentStep": 4,
             "progress": 100,
-            "brandName": request["brandName"],
-            "niceClass": request["niceClass"],
-            "goodsServices": request["goodsServices"],
+            "brandName": display_brand_name,
+            "niceClass": display_nice_class,
+            "goodsServices": display_goods_services,
             "riskLevel": risk_level,
             "riskScore": risk_score,
             "overallResult": overall_result,
             "manualReviewRequired": risk_level != "low",
+            "generatedAt": generated_at,
             "hitRules": hit_rules,
             "references": references,
+            "evidence": _build_evidence(hit_rules, references, visual_summary, generated_at),
             "summary": {
-                "brandName": request["brandName"],
-                "niceClass": request["niceClass"],
-                "submitTime": submit_time,
+                "brandName": display_brand_name,
+                "niceClass": display_nice_class,
+                "submitTime": generated_at,
                 "riskLevel": risk_level,
                 "riskScore": risk_score,
                 "overallResult": overall_result,
@@ -442,11 +505,7 @@ def process_audit_task(task_id: str, image_path: Path) -> None:
                 "radarData": vision.radar_data,
                 "matchedBrands": visual_matches,
                 "analysisMode": "remote-assisted" if vision.model_analysis else "local-opencv",
-                "summary": (
-                    vision.model_analysis.get("summary")
-                    if vision.model_analysis and vision.model_analysis.get("summary")
-                    else vision.local_summary
-                ),
+                "summary": visual_summary,
             },
             "intelligence": {
                 "crossClassShield": cross_class_shield,
@@ -458,7 +517,7 @@ def process_audit_task(task_id: str, image_path: Path) -> None:
             "advice": {
                 "recommendations": recommendations,
                 "documentPreview": _document_preview(
-                    request["brandName"], request["niceClass"], overall_result, recommendations
+                    display_brand_name, display_nice_class, overall_result, recommendations
                 ),
                 "documentDownloadUrl": f"/api/audit/report/{task_id}/pdf",
             },
