@@ -1,1 +1,5 @@
 export * from '@/api/audit'
+export * from '@/api/auth'
+export * from '@/api/admin'
+export * from '@/api/platform'
+export * from '@/api/saas'

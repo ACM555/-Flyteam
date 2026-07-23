@@ -1,6 +1,7 @@
 import { BlockOutlined, WarningOutlined } from '@ant-design/icons'
-import { Card, Empty, Progress, Space, Tag, Typography } from 'antd'
+import { Card, Progress, Space, Tag, Typography } from 'antd'
 import type { ReactNode } from 'react'
+import ProductEmpty from '@/components/ProductEmpty'
 import type { HitRule } from '@/types/audit'
 
 const { Paragraph, Text, Title } = Typography
@@ -83,7 +84,7 @@ function RuleGroup({ icon, rules, title }: RuleGroupProps) {
           <RuleCard key={`${rule.ruleType}-${rule.article}-${rule.note}`} rule={rule} showSimilarity={isRelative} />
         ))
       ) : (
-        <Empty description={`暂无${title}`} />
+        <ProductEmpty description={`未归档${title}`} detail="当前规则库未覆盖该类条款，建议人工复核官方数据库后补充规则。" />
       )}
     </Space>
   )
@@ -91,7 +92,7 @@ function RuleGroup({ icon, rules, title }: RuleGroupProps) {
 
 function HitRuleList({ hitRules }: HitRuleListProps) {
   if (hitRules.length === 0) {
-    return <Empty description="暂无规则匹配结果" />
+    return <ProductEmpty description="未触发规则匹配" detail="当前标识未匹配到绝对或相对驳回条款。这不等于零风险，正式提交前仍需在 NOIP、WIPO、TMview 完成检索。" />
   }
 
   const absoluteRules = sortRules(hitRules.filter((rule) => rule.ruleType === 'absolute'))

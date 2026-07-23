@@ -7,6 +7,19 @@ const rootDirectory = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 950,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-runtime': ['react', 'react-dom', 'react-router-dom'],
+          'motion-runtime': ['motion'],
+          'charts-runtime': ['recharts'],
+          'network-runtime': ['axios'],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {
