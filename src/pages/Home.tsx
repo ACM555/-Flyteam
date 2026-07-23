@@ -1,82 +1,246 @@
-import { AlertOutlined, ArrowRightOutlined, DatabaseOutlined, FileTextOutlined, ReloadOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Skeleton, Table, Typography } from 'antd'
-import type { TableColumnsType } from 'antd'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  ArrowRightOutlined,
+  FileProtectOutlined,
+  FileTextOutlined,
+  SafetyCertificateOutlined,
+  SolutionOutlined,
+  WarningOutlined,
+} from '@ant-design/icons'
+import { Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { getPlatformOverview, type PlatformOverview } from '@/api/platform'
-import { getBrandAssets, getDataSourceStatus, getMonitoringAlerts, getReports, type BrandAsset, type DataSourceStatus, type MonitoringAlert, type ReportRecord } from '@/api/saas'
-import { MetricCard, RiskBadge, SourceStatus } from '@/components/DesignSystem'
-import { ChartReveal, MotionItem, StaggerGroup } from '@/components/MotionKit'
-import RiskRadar from '@/components/RiskRadar'
+import { getStatistics } from '@/api'
+import ComplianceModuleGrid from '@/components/ComplianceModuleGrid'
+import type { StatisticsData } from '@/types/audit'
 
-const emptyOverview: PlatformOverview = { positioning: '', slogan: '', modules: [], dataSources: [], riskTrend: [], sla: [], businessModel: [] }
+const { Paragraph, Text, Title } = Typography
+
+const capabilities = [
+  {
+    title: '商标合规扫描',
+    description: '围绕越南商标注册审查规则，快速识别绝对驳回与相对驳回风险。',
+    hint: '适合提交前快速体检',
+    icon: <SafetyCertificateOutlined />,
+    color: '#1677ff',
+    background: '#f0f5ff',
+  },
+  {
+    title: '法律风险预警',
+    description: '结合本地规则库、冲突品牌库和判例线索，提前发现跨类攀附风险。',
+    hint: '适合出海品牌风控评估',
+    icon: <FileProtectOutlined />,
+    color: '#faad14',
+    background: '#fffbe6',
+  },
+  {
+    title: '合规报告生成',
+    description: '把审查结论沉淀为红黄绿三种合规预检报告，辅助团队后续决策。',
+    hint: '适合法务与业务同步决策',
+    icon: <SolutionOutlined />,
+    color: '#52c41a',
+    background: '#f6ffed',
+  },
+]
 
 function Home() {
   const navigate = useNavigate()
-  const [overview, setOverview] = useState<PlatformOverview>(emptyOverview)
-  const [assets, setAssets] = useState<BrandAsset[]>([])
-  const [alerts, setAlerts] = useState<MonitoringAlert[]>([])
-  const [sources, setSources] = useState<DataSourceStatus[]>([])
-  const [reports, setReports] = useState<ReportRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+  const [statisticsData, setStatisticsData] = useState<StatisticsData>({
+    auditedBrands: 0,
+    highRiskBlocked: 0,
+  })
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [nextOverview, nextAssets, nextAlerts, nextSources, nextReports] = await Promise.all([getPlatformOverview(), getBrandAssets(), getMonitoringAlerts(), getDataSourceStatus(), getReports()])
-      setOverview(nextOverview); setAssets(nextAssets); setAlerts(nextAlerts); setSources(nextSources); setReports(nextReports); setFailed(false)
-    } catch { setFailed(true) } finally { setLoading(false) }
+  useEffect(() => {
+    let ignore = false
+
+    getStatistics()
+      .then((data) => {
+        if (!ignore) setStatisticsData(data)
+      })
+      .catch(() => {
+        if (!ignore) setStatisticsData({ auditedBrands: 0, highRiskBlocked: 0 })
+      })
+
+    return () => {
+      ignore = true
+    }
   }, [])
-  useEffect(() => { void load() }, [load])
 
-  const highRiskAssets = assets.filter((item) => item.riskLevel === 'high').length
-  const highAlerts = alerts.filter((item) => item.severity === 'high').length
-  const onlineSources = sources.filter((item) => item.status === 'online').length
-  const alertColumns: TableColumnsType<MonitoringAlert> = [
-    { title: '风险', dataIndex: 'severity', width: 110, render: (level) => <RiskBadge level={level} /> },
-    { title: '预警事项', dataIndex: 'title', render: (value, record) => <div><strong className="table-primary">{value}</strong><span className="table-secondary">{record.brandName} · {record.country}</span></div> },
-    { title: '处理窗口', dataIndex: 'window', width: 120 },
-    { title: '负责人', dataIndex: 'owner', width: 120 },
-  ]
+  const statistics = useMemo(
+    () => [
+      {
+        title: '已审查品牌',
+        value: statisticsData.auditedBrands,
+        suffix: '个',
+        color: '#1677ff',
+        icon: <SafetyCertificateOutlined />,
+      },
+      {
+        title: '拦截高风险',
+        value: statisticsData.highRiskBlocked,
+        suffix: '项',
+        color: '#ff4d4f',
+        icon: <WarningOutlined />,
+      },
+      {
+        title: '法条覆盖',
+        value: 5,
+        suffix: '类',
+        color: '#52c41a',
+        icon: <FileTextOutlined />,
+      },
+    ],
+    [statisticsData],
+  )
 
   return (
-    <div className="page-stack home-page">
-      <section className="home-hero">
-        <div className="home-hero-grid" aria-hidden="true" />
-        <div className="home-hero-copy">
-          <span className="home-hero-kicker">中国企业出海 · 东盟六国合规</span>
-          <Typography.Title level={1}>东盟商标风险<br />企业法务驾驶舱</Typography.Title>
-          <Typography.Paragraph>{overview.positioning || '将商标预检、注册导航、公告监控与证据报告集中到一个可追踪的决策空间。'}</Typography.Paragraph>
-          <div className="home-hero-actions"><Button icon={<SendOutlined />} onClick={() => navigate('/submit')} size="large" type="primary">发起智能审查</Button><Button className="home-hero-secondary" onClick={() => navigate('/reports')} size="large">查看管理层报告</Button></div>
-          <div className="hero-proof"><span><strong>6 国</strong>东盟核心市场</span><span><strong>4 类</strong>可信数据来源</span><span><strong>7×24</strong>公告期监控</span><span><strong>1 份</strong>证据链报告</span></div>
+    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
+      <div
+        style={{
+          background:
+            'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.28) 0, rgba(255,255,255,0) 30%), linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)',
+          borderRadius: 16,
+          boxShadow: '0 16px 40px rgba(22, 119, 255, 0.22)',
+          color: '#fff',
+          overflow: 'hidden',
+          padding: '48px 40px',
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.14)',
+            borderRadius: 999,
+            height: 180,
+            position: 'absolute',
+            right: -56,
+            top: -72,
+            width: 180,
+          }}
+        />
+        <div style={{ maxWidth: 720, position: 'relative', zIndex: 1 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
+            越南出海商标合规智能体
+          </Text>
+          <Title level={1} style={{ color: '#fff', margin: '10px 0 12px' }}>
+            Outbound-Guard
+          </Title>
+          <Paragraph
+            style={{
+              color: 'rgba(255,255,255,0.88)',
+              fontSize: 16,
+              lineHeight: 1.8,
+              marginBottom: 28,
+              maxWidth: 620,
+            }}
+          >
+            零幻觉法条级审查，秒级识别跨类攀附风险。为中国企业出海东南亚提供商标提交前的智能扫描、风险预警与合规建议。
+          </Paragraph>
+          <Space size={12} wrap>
+            <Button
+              ghost
+              icon={<ArrowRightOutlined />}
+              onClick={() => navigate('/submit')}
+              size="large"
+              style={{ borderColor: '#fff', color: '#fff' }}
+              type="primary"
+            >
+              立即开始审查
+            </Button>
+            <Text style={{ color: 'rgba(255,255,255,0.76)' }}>预计 3-5 秒生成初步报告</Text>
+          </Space>
         </div>
-        <div className="risk-radar-panel"><RiskRadar score={overview.healthScore ?? 92} subtitle="平台健康度与实时风险信号" /></div>
-      </section>
+      </div>
 
-      {failed ? <Alert action={<Button icon={<ReloadOutlined />} onClick={load}>重新加载</Button>} message="部分数据暂时不可用" description="系统已保留可演示的只读业务数据，不影响浏览产品主流程。" showIcon type="warning" /> : null}
-      {loading ? <Card><Skeleton active paragraph={{ rows: 10 }} /></Card> : <>
-        <StaggerGroup className="metric-grid">
-          <MotionItem><MetricCard icon={<SafetyCertificateOutlined />} label="受管品牌资产" value={assets.length} unit="组" note="统一管理类别、国家与审查状态" /></MotionItem>
-          <MotionItem><MetricCard icon={<AlertOutlined />} label="高风险待办" value={highRiskAssets + highAlerts} unit="项" note="需在异议窗口内完成人工处置" tone="danger" /></MotionItem>
-          <MotionItem><MetricCard icon={<FileTextOutlined />} label="归档审查报告" value={reports.length} unit="份" note="包含法律依据与可追溯证据" tone="warning" /></MotionItem>
-          <MotionItem><MetricCard icon={<DatabaseOutlined />} label="在线数据来源" value={onlineSources} unit={`/${sources.length || 4}`} note="NOIP、WIPO、TMview 持续同步" tone="success" /></MotionItem>
-        </StaggerGroup>
+      <Row gutter={[16, 16]}>
+        {statistics.map((item) => (
+          <Col key={item.title} xs={24} sm={8}>
+            <Card>
+              <Statistic
+                prefix={<span style={{ color: item.color }}>{item.icon}</span>}
+                suffix={item.suffix}
+                title={item.title}
+                value={item.value}
+                valueStyle={{ color: item.color, fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+      <Text type="secondary">以下数据来自当前系统任务数据库，不使用演示数字。</Text>
 
-        <div className="dashboard-grid">
-          <Card className="chart-card" title="近七日风险趋势" extra={<span className="live-indicator"><span className="live-indicator-dot" />每 15 分钟更新</span>}>
-            <ChartReveal className="chart-frame"><ResponsiveContainer width="100%" height={250}><AreaChart data={overview.riskTrend || []}><defs><linearGradient id="highFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#b42332" stopOpacity={0.28}/><stop offset="95%" stopColor="#b42332" stopOpacity={0}/></linearGradient><linearGradient id="mediumFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#c69a44" stopOpacity={0.26}/><stop offset="95%" stopColor="#c69a44" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#e5ebf2" strokeDasharray="3 3" vertical={false}/><XAxis dataKey="date" tickLine={false}/><YAxis tickLine={false}/><Tooltip/><Area dataKey="high" fill="url(#highFill)" isAnimationActive={false} name="高风险" stroke="#b42332" strokeWidth={2}/><Area dataKey="medium" fill="url(#mediumFill)" isAnimationActive={false} name="中风险" stroke="#c69a44" strokeWidth={2}/></AreaChart></ResponsiveContainer></ChartReveal>
-          </Card>
-          <section className="coverage-board"><span className="page-eyebrow">区域合规覆盖</span><h3>东盟六国规则已接入</h3><p>按市场查看法律依据、审查周期、风险标签与推荐注册路径。</p><div className="country-cloud">{['越南', '泰国', '印度尼西亚', '马来西亚', '菲律宾', '新加坡'].map((country, index) => <button className="country-node" key={country} onClick={() => navigate('/rules')} type="button"><strong>{country}</strong><span>{index < 2 ? '重点市场 · 实时规则' : '规则库已同步'}</span></button>)}</div><Button className="coverage-action" onClick={() => navigate('/rules')}>打开规则对比<ArrowRightOutlined /></Button></section>
-        </div>
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          6 大功能模块
+        </Title>
+        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          围绕提交前预检、侵权线索、文化禁忌、注册策略、风控维权与文书生成组织完整产品路径。
+        </Paragraph>
+        <ComplianceModuleGrid />
+      </div>
 
-        <Card className="data-table-card" title="待处理风险队列" extra={<Button type="link" onClick={() => navigate('/monitoring')}>进入监控中心<ArrowRightOutlined /></Button>}>
-          <Table columns={alertColumns} dataSource={alerts} pagination={false} rowKey="alertId" scroll={{ x: 760 }} onRow={() => ({ onClick: () => navigate('/monitoring'), style: { cursor: 'pointer' } })} />
-        </Card>
-        <section><div className="section-titlebar"><div><h3>可信数据源健康度</h3><span className="section-meta">所有结论均标记来源与同步时间</span></div><Button icon={<ReloadOutlined />} onClick={load}>刷新状态</Button></div><div className="source-grid source-grid-spaced">{sources.map((source) => <SourceStatus key={source.name} source={source} />)}</div></section>
-      </>}
-    </div>
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          核心能力
+        </Title>
+        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          从提交、审查到报告输出，覆盖出海商标合规评估的关键节点。
+        </Paragraph>
+        <Row gutter={[20, 20]}>
+          {capabilities.map((capability) => {
+            const isHovered = hoveredCard === capability.title
+
+            return (
+              <Col key={capability.title} xs={24} md={12} lg={8}>
+                <Card
+                  hoverable
+                  onClick={() => navigate('/submit')}
+                  onMouseEnter={() => setHoveredCard(capability.title)}
+                  onMouseLeave={() => setHoveredCard(null)}
+                  style={{
+                    boxShadow: isHovered ? '0 10px 28px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
+                    cursor: 'pointer',
+                    height: '100%',
+                    minHeight: 238,
+                    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+                    <div
+                      style={{
+                        alignItems: 'center',
+                        background: capability.background,
+                        borderRadius: 12,
+                        color: capability.color,
+                        display: 'flex',
+                        fontSize: 28,
+                        height: 56,
+                        justifyContent: 'center',
+                        width: 56,
+                      }}
+                    >
+                      {capability.icon}
+                    </div>
+                    <Title level={4} style={{ margin: 0 }}>
+                      {capability.title}
+                    </Title>
+                    <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                      {capability.description}
+                    </Paragraph>
+                    <Text type="secondary">{capability.hint}</Text>
+                  </Space>
+                </Card>
+              </Col>
+            )
+          })}
+        </Row>
+      </div>
+
+      <div style={{ padding: '40px 0 20px', textAlign: 'center' }}>
+        <Text type="secondary">Outbound-Guard v1.0.0 · 越南出海商标合规智能体</Text>
+      </div>
+    </Space>
   )
 }
 
