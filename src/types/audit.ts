@@ -4,14 +4,17 @@ export interface AuditRequest {
   niceClass: string
   goodsServices: string
   businessDescription?: string
-  targetCountries?: string[]
-  operationStage?: 'pre-entry' | 'launching' | 'operating'
-  plannedMarkets?: number
-  hasChinaBaseMark?: boolean
+  targetMarkets: string[]
+  hasChinaBase: boolean
   logo: string
 }
 
 export type AuditFormData = AuditRequest
+
+export interface StatisticsData {
+  auditedBrands: number
+  highRiskBlocked: number
+}
 
 export interface AuditResponse {
   code: number
@@ -22,6 +25,8 @@ export interface AuditResponse {
 }
 
 export interface HitRule {
+  ruleId?: string
+  ruleName?: string
   ruleType: 'absolute' | 'relative'
   article: string
   content: string
@@ -39,17 +44,6 @@ export interface LegalReference {
   registrationNo: string
   summary: string
   relevance: string
-  sourceUrl?: string
-  retrievedAt?: string
-}
-
-export interface EvidenceItem {
-  title: string
-  summary: string
-  basis: 'rule' | 'evidence' | 'heuristic'
-  source: string
-  retrievedAt: string
-  sourceUrl?: string
 }
 
 export interface AuditResult {
@@ -65,14 +59,11 @@ export interface AuditResult {
   riskScore: number
   overallResult: string
   manualReviewRequired: boolean
-  generatedAt?: string
   hitRules: HitRule[]
   references: LegalReference[]
-  evidence: EvidenceItem[]
   summary: {
     brandName: string
     niceClass: string
-    submitTime?: string
     riskLevel: 'high' | 'medium' | 'low'
     riskScore: number
     overallResult: string
@@ -115,52 +106,6 @@ export interface AuditResult {
       thumbnailUrl: string
       matchScore: number
     }>
-    analysisMode?: string
-    summary?: string
-  }
-  intelligence: {
-    crossClassShield: {
-      triggered: boolean
-      score: number
-      title: string
-      explanation: string
-      protectedElements: string[]
-      suggestedAction: string
-    }
-    refusalHistory: {
-      triggered: boolean
-      title: string
-      explanation: string
-      redFlags: string[]
-      evidence: string[]
-    }
-    culturalReview: {
-      triggered: boolean
-      title: string
-      country: string
-      rules: Array<{
-        label: string
-        severity: 'high' | 'medium' | 'low'
-        note: string
-      }>
-    }
-    registrationStrategy: {
-      route: string
-      rationale: string
-      marketCount: number
-      timeline: Array<{
-        stage: string
-        duration: string
-        output: string
-      }>
-      costNotes: string[]
-    }
-    monitoring: Array<{
-      name: string
-      cadence: string
-      source: string
-      actionWindow: string
-    }>
   }
   advice: {
     recommendations: Array<{
@@ -169,7 +114,35 @@ export interface AuditResult {
       description: string
     }>
     documentPreview: string
+    applicationDocumentPreview: string
+    powerOfAttorneyPreview: string
     documentDownloadUrl?: string
+  }
+  registrationStrategy: {
+    targetMarkets: string[]
+    hasChinaBase: boolean
+    recommendedPath: string
+    reason: string
+    costSaving: string
+    costComparison: Array<{
+      option: string
+      costLevel: string
+      speed: string
+      suitableFor: string
+      note: string
+    }>
+    timeline: Array<{
+      stage: string
+      duration: string
+      action: string
+    }>
+    localizedGoodsServices: Array<{
+      market: string
+      original: string
+      localized: string
+      note: string
+    }>
+    risks: string[]
   }
 }
 
