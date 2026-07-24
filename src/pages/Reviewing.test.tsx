@@ -10,7 +10,7 @@ describe('Reviewing', () => {
     renderWithProviders(<Reviewing />, '/reviewing')
 
     expect(await screen.findByText('审查失败')).toBeInTheDocument()
-    expect(screen.getAllByText('当前没有可查看的审查任务，请先提交品牌信息。').length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: '重新提交' })).toBeInTheDocument()
+    expect(screen.getByText('缺少任务ID，请从提交页重新进入')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重新审查' })).toBeDisabled()
   })
 })

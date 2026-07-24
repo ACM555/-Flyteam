@@ -5,6 +5,7 @@ import Submit from '@/pages/Submit'
 import { renderWithProviders } from '@/test/render'
 
 vi.mock('@/api', () => ({ audit: vi.fn() }))
+vi.mock('@/api/platform', () => ({ getCountryRules: vi.fn().mockResolvedValue([]) }))
 
 describe('Submit', () => {
   it('提交空表单时在对应字段附近显示校验错误', async () => {

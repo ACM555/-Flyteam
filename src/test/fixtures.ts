@@ -25,29 +25,36 @@ export function createAuditResult(overrides: Partial<AuditResult> = {}): AuditRe
     absolute: { hasRisk: true, rejectionProbability: 76, articles: [] },
     relative: { hasRisk: true, conflicts: [], precedents: [] },
     visual: { radarData: [], matchedBrands: [] },
+    intelligence: {
+      crossClassShield: {
+        triggered: false,
+        score: 0,
+        title: '跨类保护扫描',
+        explanation: '',
+        protectedElements: [],
+        suggestedAction: '',
+      },
+      refusalHistory: {
+        triggered: false,
+        title: '驳回前科',
+        explanation: '',
+        redFlags: [],
+        evidence: [],
+      },
+      culturalReview: { triggered: false, title: '文化审查', country: '越南', rules: [] },
+      registrationStrategy: { route: '单国申请', rationale: '', marketCount: 1, timeline: [], costNotes: [] },
+      monitoring: [],
+    },
     advice: {
       recommendations: [],
       documentPreview: '',
-      applicationDocumentPreview: '',
-      powerOfAttorneyPreview: '',
       documentDownloadUrl: '/api/audit/report/task-001/pdf',
-    },
-    registrationStrategy: {
-      targetMarkets: ['越南'],
-      hasChinaBase: false,
-      recommendedPath: '单国申请',
-      reason: '目标市场较少，优先采用单国申请路径。',
-      costSaving: '以稳定性优先',
-      costComparison: [],
-      timeline: [],
-      localizedGoodsServices: [],
-      risks: [],
     },
   }
 
   return {
     ...base,
     ...overrides,
-    registrationStrategy: overrides.registrationStrategy ?? base.registrationStrategy,
+    intelligence: overrides.intelligence ?? base.intelligence,
   }
 }

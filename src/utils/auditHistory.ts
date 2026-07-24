@@ -40,8 +40,8 @@ export function saveAuditTask(taskId: string, request: AuditRequest) {
     englishName: request.englishName,
     niceClass: request.niceClass,
     goodsServices: request.goodsServices,
-    targetMarkets: request.targetMarkets,
-    hasChinaBase: request.hasChinaBase,
+    targetMarkets: request.targetCountries ?? [],
+    hasChinaBase: request.hasChinaBaseMark ?? false,
     createdAt: new Date().toISOString(),
   }
   const history = getAuditHistory().filter((item) => item.taskId !== taskId)

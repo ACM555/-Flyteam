@@ -48,10 +48,18 @@ class Settings:
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
+    BAILIAN_API_KEY: str = os.getenv("BAILIAN_API_KEY", "")
+    BAILIAN_WORKSPACE_ID: str = os.getenv("BAILIAN_WORKSPACE_ID", "")
+    BAILIAN_BASE_URL: str = os.getenv("BAILIAN_BASE_URL", "")
+    BAILIAN_MODEL: str = os.getenv("BAILIAN_MODEL", "kimi-k2.7-code")
+    ASSISTANT_KNOWLEDGE_DIR: str = os.getenv("ASSISTANT_KNOWLEDGE_DIR", "data/assistant_knowledge")
+    ASSISTANT_MAX_FILE_MB: int = _get_int("ASSISTANT_MAX_FILE_MB", 10)
+
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")
     REPORT_DIR: str = os.getenv("REPORT_DIR", "reports")
     DATA_DIR: str = os.getenv("DATA_DIR", "data")
     RULES_DIR: str = os.getenv("RULES_DIR", "rules")
+    DATABASE_PATH: str = os.getenv("DATABASE_PATH", "data/outbound_guard.sqlite3")
 
     AUDIT_TIMEOUT_SECONDS: int = _get_int("AUDIT_TIMEOUT_SECONDS", 60)
     MAX_IMAGE_SIZE_MB: int = _get_int("MAX_IMAGE_SIZE_MB", 5)
@@ -76,6 +84,8 @@ class Settings:
             errors.append("AUDIT_TIMEOUT_SECONDS 必须大于 0")
         if self.MAX_IMAGE_SIZE_MB <= 0:
             errors.append("MAX_IMAGE_SIZE_MB 必须大于 0")
+        if self.ASSISTANT_MAX_FILE_MB <= 0:
+            errors.append("ASSISTANT_MAX_FILE_MB 必须大于 0")
 
         required_dirs = {
             "UPLOAD_DIR": self.UPLOAD_DIR,
@@ -98,8 +108,30 @@ class Settings:
     def ensure_dirs(self) -> None:
         """确保存储目录存在。"""
 
-        for directory in [self.UPLOAD_DIR, self.REPORT_DIR, self.DATA_DIR, self.RULES_DIR]:
+        for directory in [
+            self.UPLOAD_DIR,
+            self.REPORT_DIR,
+            self.DATA_DIR,
+            self.RULES_DIR,
+            self.ASSISTANT_KNOWLEDGE_DIR,
+        ]:
             Path(directory).mkdir(parents=True, exist_ok=True)
+
+    @property
+    def database_path(self) -> Path:
+        return Path(self.DATABASE_PATH)
+
+    @property
+    def bailian_base_url(self) -> str:
+        if self.BAILIAN_BASE_URL:
+            return self.BAILIAN_BASE_URL.rstrip("/")
+        if self.BAILIAN_WORKSPACE_ID:
+            return (
+                "https://"
+                f"{self.BAILIAN_WORKSPACE_ID}.cn-beijing.maas.aliyuncs.com"
+                "/compatible-mode/v1"
+            )
+        return ""
 
 
 settings = Settings()

@@ -16,6 +16,7 @@ import type { MenuProps } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { PageTransition } from '@/components/MotionKit'
+import AiAssistant from '@/components/AiAssistant'
 
 const { Content, Header, Sider } = Layout
 
@@ -107,6 +108,7 @@ function AppLayout() {
             <Outlet />
           </PageTransition>
         </Content>
+        <AiAssistant />
       </Layout>
     </Layout>
   )
