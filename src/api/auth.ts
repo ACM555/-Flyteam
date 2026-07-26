@@ -4,7 +4,7 @@ import type { UnifiedResponse } from '@/types/audit'
 export interface AuthUser {
   userId: string
   username: string
-  role: 'admin' | 'user'
+  role: 'superadmin' | 'user'
   company: string
   createdAt: string
 }

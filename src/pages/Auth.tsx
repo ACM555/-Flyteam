@@ -75,7 +75,7 @@ function Auth({ mode }: AuthProps) {
         : await login({ username: payload.username, password: payload.password })
       message.success(isRegister ? '注册成功' : '登录成功')
       const from = new URLSearchParams(location.search).get('from')
-      navigate(from || (user.role === 'admin' ? '/admin' : '/'), { replace: true })
+      navigate(from || (user.role === 'superadmin' ? '/admin' : '/'), { replace: true })
     } catch {
       // Request interceptor already shows the backend validation message.
     } finally {
@@ -176,7 +176,7 @@ function Auth({ mode }: AuthProps) {
             <Title level={3}>{isRegister ? '创建企业账号' : '账号登录'}</Title>
             <Text type="secondary">
               {isRegister
-                ? '创建普通成员账号；如需后台权限，请填写团队提供的邀请码。'
+                ? '创建普通成员账号；系统管理权限仅由超级管理员在本地配置。'
                 : '请输入账号密码进入商标合规风控系统。'}
             </Text>
           </Space>
@@ -212,9 +212,6 @@ function Auth({ mode }: AuthProps) {
               <>
                 <Form.Item label="企业/团队" name="company">
                   <Input placeholder="例如 Flyteam 法律科技" />
-                </Form.Item>
-                <Form.Item label="后台邀请码" name="inviteCode">
-                  <Input placeholder="普通成员可留空" />
                 </Form.Item>
               </>
             ) : null}

@@ -60,6 +60,8 @@ class Settings:
     DATA_DIR: str = os.getenv("DATA_DIR", "data")
     RULES_DIR: str = os.getenv("RULES_DIR", "rules")
     DATABASE_PATH: str = os.getenv("DATABASE_PATH", "data/outbound_guard.sqlite3")
+    SUPERADMIN_USERNAME: str = os.getenv("SUPERADMIN_USERNAME", "superadmin")
+    SUPERADMIN_PASSWORD: str = os.getenv("SUPERADMIN_PASSWORD", "")
 
     AUDIT_TIMEOUT_SECONDS: int = _get_int("AUDIT_TIMEOUT_SECONDS", 60)
     MAX_IMAGE_SIZE_MB: int = _get_int("MAX_IMAGE_SIZE_MB", 5)
@@ -84,6 +86,8 @@ class Settings:
             errors.append("AUDIT_TIMEOUT_SECONDS 必须大于 0")
         if self.MAX_IMAGE_SIZE_MB <= 0:
             errors.append("MAX_IMAGE_SIZE_MB 必须大于 0")
+        if not self.SUPERADMIN_PASSWORD:
+            errors.append("必须通过 SUPERADMIN_PASSWORD 配置超级管理员密码")
         if self.ASSISTANT_MAX_FILE_MB <= 0:
             errors.append("ASSISTANT_MAX_FILE_MB 必须大于 0")
 

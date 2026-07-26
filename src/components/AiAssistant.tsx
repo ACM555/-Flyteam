@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { RobotOutlined, SendOutlined, CloseOutlined, FileTextOutlined, PaperClipOutlined } from '@ant-design/icons'
 import { Button, Input, Spin, Tag, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -7,6 +7,43 @@ import { askAssistant, type AssistantReply } from '@/api/assistant'
 interface ChatMessage {
   role: 'assistant' | 'user'
   text: string
+}
+
+interface AssistantPosition {
+  x: number
+  y: number
+}
+
+interface DragState {
+  pointerId: number
+  startX: number
+  startY: number
+  originX: number
+  originY: number
+  moved: boolean
+}
+
+const launcherSize = 64
+const viewportPadding = 16
+
+function getInitialPosition(): AssistantPosition {
+  if (typeof window === 'undefined') {
+    return { x: 0, y: 0 }
+  }
+
+  return {
+    x: window.innerWidth - launcherSize - 28,
+    y: window.innerHeight - launcherSize - 28,
+  }
+}
+
+function clampPosition(position: AssistantPosition): AssistantPosition {
+  if (typeof window === 'undefined') return position
+
+  return {
+    x: Math.min(Math.max(position.x, viewportPadding), window.innerWidth - launcherSize - viewportPadding),
+    y: Math.min(Math.max(position.y, viewportPadding), window.innerHeight - launcherSize - viewportPadding),
+  }
 }
 
 const pageActions: Record<string, string> = {
@@ -29,10 +66,57 @@ export default function AiAssistant() {
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [imageDataUrl, setImageDataUrl] = useState<string>()
+  const [position, setPosition] = useState<AssistantPosition>(() => clampPosition(getInitialPosition()))
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', text: '我是合规引导助手。可以协助你准备材料、理解风险和定位系统规则。' },
   ])
   const [reply, setReply] = useState<AssistantReply | null>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const suppressClickRef = useRef(false)
+  const panelClassName = [
+    'ai-assistant__panel',
+    position.x < 380 ? 'ai-assistant__panel--from-left' : '',
+    position.y < 380 ? 'ai-assistant__panel--drop-down' : '',
+  ].filter(Boolean).join(' ')
+
+  useEffect(() => {
+    const handleResize = () => setPosition((current) => clampPosition(current))
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+
+      const deltaX = event.clientX - drag.startX
+      const deltaY = event.clientY - drag.startY
+      if (Math.abs(deltaX) + Math.abs(deltaY) > 4) {
+        drag.moved = true
+      }
+
+      setPosition(clampPosition({ x: drag.originX + deltaX, y: drag.originY + deltaY }))
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const drag = dragRef.current
+      if (!drag || event.pointerId !== drag.pointerId) return
+
+      suppressClickRef.current = drag.moved
+      dragRef.current = null
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [])
 
   const send = async () => {
     const text = question.trim()
@@ -59,10 +143,29 @@ export default function AiAssistant() {
     reader.readAsDataURL(file)
   }
 
+  const startDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: position.x,
+      originY: position.y,
+      moved: false,
+    }
+  }
+
+  const togglePanel = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    setOpen((value) => !value)
+  }
+
   return (
-    <aside className={`ai-assistant ${open ? 'ai-assistant--open' : ''}`} aria-label="合规引导助手">
+    <aside className={`ai-assistant ${open ? 'ai-assistant--open' : ''}`} style={{ left: position.x, top: position.y }} aria-label="合规引导助手">
       {open && (
-        <section className="ai-assistant__panel">
+        <section className={panelClassName}>
           <header className="ai-assistant__header">
             <div>
               <Typography.Text strong>合规引导助手</Typography.Text>
@@ -76,7 +179,12 @@ export default function AiAssistant() {
                 {message.text}
               </p>
             ))}
-            {loading && <Spin size="small" tip="正在检索已授权资料…" />}
+            {loading && (
+              <div className="ai-assistant__loading">
+                <Spin size="small" />
+                <Typography.Text>正在检索已授权资料…</Typography.Text>
+              </div>
+            )}
           </div>
           {reply && (
             <div className="ai-assistant__evidence">
@@ -100,8 +208,8 @@ export default function AiAssistant() {
           </div>
         </section>
       )}
-      <Button className="ai-assistant__launcher" type="primary" icon={<RobotOutlined />} onClick={() => setOpen((value) => !value)}>
-        AI 引导
+      <Button className="ai-assistant__launcher" type="primary" icon={<RobotOutlined />} onPointerDown={startDrag} onClick={togglePanel} aria-label="拖动或打开 AI 引导">
+        <span>AI</span>
       </Button>
     </aside>
   )

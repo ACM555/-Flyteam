@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.auth import admin_user, current_user
-from app.database import get_admin_statistics, get_task, list_audit_tasks
+from app.database import get_admin_statistics, get_system_status, get_task, list_audit_tasks, list_users
 from app.services.platform_service import (
     build_report_center,
     get_brand_assets,
@@ -59,6 +59,16 @@ def admin_statistics(_: dict = Depends(admin_user)) -> dict:
 @router.get("/admin/tasks")
 def admin_tasks(_: dict = Depends(admin_user)) -> dict:
     return _success(list_audit_tasks())
+
+
+@router.get("/admin/users")
+def admin_users(_: dict = Depends(admin_user)) -> dict:
+    return _success(list_users())
+
+
+@router.get("/admin/system-status")
+def admin_system_status(_: dict = Depends(admin_user)) -> dict:
+    return _success(get_system_status())
 
 
 @router.get("/admin/tasks/{task_id}")

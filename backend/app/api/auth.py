@@ -48,16 +48,15 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
 
 
 def admin_user(user: dict = Depends(current_user)) -> dict:
-    if user.get("role") != "admin":
+    if user.get("role") != "superadmin":
         raise HTTPException(status_code=403, detail="需要管理员权限")
     return user
 
 
 @router.post("/register")
 def register(payload: RegisterRequest) -> dict:
-    role = "admin" if payload.inviteCode == "ADMIN2026" else "user"
     try:
-        user = create_user(payload.username, payload.password, payload.company, role)
+        user = create_user(payload.username, payload.password, payload.company, "user")
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     token = create_session(user["userId"])

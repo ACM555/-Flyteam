@@ -55,13 +55,13 @@ def test_health_and_safe_audit() -> None:
         assert health.json()["data"]["status"] == "ok"
 
         login = client.post(
-            "/api/auth/login", json={"username": "admin", "password": "admin123"}
+            "/api/auth/login", json={"username": "superadmin", "password": "Flyteam@Admin2026"}
         )
         assert login.status_code == 200
         admin_token = login.json()["data"]["token"]
         me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {admin_token}"})
         assert me.status_code == 200
-        assert me.json()["data"]["role"] == "admin"
+        assert me.json()["data"]["role"] == "superadmin"
 
         overview = client.get("/api/platform/overview")
         assert overview.status_code == 200
@@ -104,6 +104,18 @@ def test_health_and_safe_audit() -> None:
         )
         assert admin_tasks.status_code == 200
         assert any(item["taskId"] == task_id for item in admin_tasks.json()["data"])
+
+        admin_users = client.get(
+            "/api/admin/users", headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert admin_users.status_code == 200
+        assert any(item["role"] == "superadmin" for item in admin_users.json()["data"])
+
+        system_status = client.get(
+            "/api/admin/system-status", headers={"Authorization": f"Bearer {admin_token}"}
+        )
+        assert system_status.status_code == 200
+        assert system_status.json()["data"]["database"] == "online"
 
         reports = client.get("/api/reports", headers={"Authorization": f"Bearer {admin_token}"})
         assert reports.status_code == 200

@@ -1,5 +1,6 @@
 import {
   BarChartOutlined,
+  CloudServerOutlined,
   LogoutOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
@@ -27,11 +28,15 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   getAdminStatistics,
+  getAdminSystemStatus,
   getAdminTaskDetail,
   getAdminTasks,
+  getAdminUsers,
   type AdminStatistics,
+  type AdminSystemStatus,
   type AdminTask,
   type AdminTaskDetail,
+  type AdminUser,
 } from '@/api/admin'
 import { useAuth } from '@/context/AuthContext'
 
@@ -57,6 +62,8 @@ function Admin() {
   const { user, logout } = useAuth()
   const [statistics, setStatistics] = useState<AdminStatistics | null>(null)
   const [tasks, setTasks] = useState<AdminTask[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [systemStatus, setSystemStatus] = useState<AdminSystemStatus | null>(null)
   const [detail, setDetail] = useState<AdminTaskDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -64,12 +71,16 @@ function Admin() {
   const load = async () => {
     setLoading(true)
     try {
-      const [nextStatistics, nextTasks] = await Promise.all([
+      const [nextStatistics, nextTasks, nextUsers, nextSystemStatus] = await Promise.all([
         getAdminStatistics(),
         getAdminTasks(),
+        getAdminUsers(),
+        getAdminSystemStatus(),
       ])
       setStatistics(nextStatistics)
       setTasks(nextTasks)
+      setUsers(nextUsers)
+      setSystemStatus(nextSystemStatus)
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : '后台数据加载失败'
       message.error(errorMsg)
@@ -160,13 +171,21 @@ function Admin() {
     },
   ]
 
+  const userColumns: TableColumnsType<AdminUser> = [
+    { title: '账号', dataIndex: 'username', key: 'username', render: (value: string) => <Text strong>{value}</Text> },
+    { title: '角色', dataIndex: 'role', key: 'role', render: (value: AdminUser['role']) => <Tag color={value === 'superadmin' ? 'gold' : 'blue'}>{value === 'superadmin' ? '超级管理员' : '普通用户'}</Tag> },
+    { title: '企业/团队', dataIndex: 'company', key: 'company' },
+    { title: '活跃会话', dataIndex: 'activeSessions', key: 'activeSessions', align: 'center' },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', render: (value: string) => new Date(value).toLocaleString() },
+  ]
+
   return (
     <div className="admin-shell">
       <div className="admin-header">
         <div>
-          <Title level={2}>后台管理中心</Title>
+          <Title level={2}>超级管理员控制台</Title>
           <Paragraph type="secondary">
-            管理员 {user?.username} 正在查看审查任务、风险分布、用户与系统运行状态。
+            超级管理员 {user?.username} 正在查看审查任务、风险分布、用户与系统运行状态。
           </Paragraph>
         </div>
         <Space wrap>
@@ -203,6 +222,22 @@ function Admin() {
       </Row>
 
       <Card
+        title="系统运行状态"
+        style={{ marginTop: 24 }}
+        extra={<Tag color={systemStatus?.database === 'online' ? 'green' : 'default'}>{systemStatus?.database === 'online' ? '数据库在线' : '检查中'}</Tag>}
+      >
+        <Descriptions
+          column={{ xs: 1, sm: 2, lg: 4 }}
+          items={[
+            { key: 'database', label: '数据服务', children: <Space><CloudServerOutlined />SQLite 在线</Space> },
+            { key: 'sessions', label: '活跃会话', children: systemStatus?.activeSessions ?? 0 },
+            { key: 'processing', label: '待处理任务', children: systemStatus?.taskStatus.processing ?? 0 },
+            { key: 'checked', label: '最近巡检', children: systemStatus ? new Date(systemStatus.checkedAt).toLocaleString() : '—' },
+          ]}
+        />
+      </Card>
+
+      <Card
         title="审查任务管理"
         style={{ marginTop: 24 }}
         extra={<Text type="secondary">共 {tasks.length} 条</Text>}
@@ -219,6 +254,21 @@ function Admin() {
         ) : (
           <Empty description="暂无审查任务" />
         )}
+      </Card>
+
+      <Card
+        title="用户与权限"
+        style={{ marginTop: 24 }}
+        extra={<Text type="secondary">仅超级管理员可访问</Text>}
+      >
+        <Table<AdminUser>
+          columns={userColumns}
+          dataSource={users}
+          loading={loading}
+          pagination={{ pageSize: 8 }}
+          rowKey="userId"
+          scroll={{ x: 860 }}
+        />
       </Card>
 
       <Drawer

@@ -65,17 +65,21 @@ def init_database() -> None:
             )
             """
         )
-        if (
-            connection.execute("SELECT COUNT(*) FROM users WHERE username = 'admin'").fetchone()[0]
-            == 0
-        ):
+        if not connection.execute(
+            "SELECT 1 FROM users WHERE username = ?", (settings.SUPERADMIN_USERNAME,)
+        ).fetchone():
             connection.execute(
                 """
                 INSERT INTO users (
                     user_id, username, password_hash, role, company, created_at
-                ) VALUES (?, 'admin', ?, 'admin', 'Outbound-Guard Team', ?)
+                ) VALUES (?, ?, ?, 'superadmin', 'Outbound-Guard Platform', ?)
                 """,
-                (secrets.token_hex(16), _hash_password("admin123"), _now()),
+                (
+                    secrets.token_hex(16),
+                    settings.SUPERADMIN_USERNAME,
+                    _hash_password(settings.SUPERADMIN_PASSWORD),
+                    _now(),
+                ),
             )
 
 
@@ -295,6 +299,47 @@ def get_admin_statistics() -> dict[str, Any]:
         "processingTasks": int(processing),
         "registeredUsers": int(users),
         "mediumRisk": int(medium_risk),
+    }
+
+
+def list_users(limit: int = 100) -> list[dict[str, Any]]:
+    with _connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT users.user_id, users.username, users.role, users.company, users.created_at,
+                   COUNT(user_sessions.token) AS active_sessions
+            FROM users
+            LEFT JOIN user_sessions ON users.user_id = user_sessions.user_id
+            GROUP BY users.user_id
+            ORDER BY users.created_at DESC
+            LIMIT ?
+            """,
+            (max(1, min(limit, 200)),),
+        ).fetchall()
+    return [
+        {
+            "userId": row["user_id"],
+            "username": row["username"],
+            "role": row["role"],
+            "company": row["company"],
+            "createdAt": row["created_at"],
+            "activeSessions": int(row["active_sessions"]),
+        }
+        for row in rows
+    ]
+
+
+def get_system_status() -> dict[str, Any]:
+    with _connect() as connection:
+        task_counts = connection.execute(
+            "SELECT status, COUNT(*) AS total FROM audit_tasks GROUP BY status"
+        ).fetchall()
+        session_count = connection.execute("SELECT COUNT(*) FROM user_sessions").fetchone()[0]
+    return {
+        "database": "online",
+        "activeSessions": int(session_count),
+        "taskStatus": {row["status"]: int(row["total"]) for row in task_counts},
+        "checkedAt": _now(),
     }
 
 

@@ -35,7 +35,7 @@ request.interceptors.response.use(
   (error) => {
     if (error.response) {
       const status = error.response.status
-      const backendMessage = error.response.data?.message
+      const backendMessage = error.response.data?.message || error.response.data?.detail
       const msg =
         backendMessage ||
         (status === 500
