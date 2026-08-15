@@ -3,14 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import audit, health
+from app.api import assistant, audit, auth, health, platform
 from app.core.config import settings
+from app.database import init_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.validate()
     settings.ensure_dirs()
+    init_database()
     yield
 
 app = FastAPI(
@@ -33,7 +35,10 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+app.include_router(platform.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
 
 
 @app.get("/")

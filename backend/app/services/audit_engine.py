@@ -838,6 +838,93 @@ def run_audit(req: dict[str, Any]) -> dict[str, Any]:
     manual_review_required = bool([rule for rule in hit_rules if rule.get("applicable")]) or score >= 40
 
     suggestions = _build_suggestions(hit_rules, score)
+    absolute_rules = [rule for rule in hit_rules if rule.get("ruleType") == "absolute"]
+    relative_rules = [rule for rule in hit_rules if rule.get("ruleType") == "relative"]
+    trademark_references = [
+        reference for reference in references if reference.get("refType") == "trademark"
+    ]
+    case_references = [reference for reference in references if reference.get("refType") == "case"]
+    visual_candidates = vision.get("matchedBrands", [])
+    target_markets = req.get("targetMarkets") or req.get("targetCountries") or ["越南"]
+    high_conflict = max(
+        [int(rule.get("similarityScore") or 0) for rule in relative_rules]
+        + [int(item.get("matchScore") or 0) for item in visual_candidates],
+        default=0,
+    )
+    cross_class_triggered = high_conflict >= 75 or (risk_level == "high" and bool(visual_candidates))
+    chinese_only = bool(str(req.get("brandName") or "")) and not str(req.get("englishName") or "").strip()
+    strategy_timeline = [
+        {
+            "stage": item.get("stage", ""),
+            "duration": item.get("duration", ""),
+            "output": item.get("action", ""),
+        }
+        for item in registration_strategy.get("timeline", [])
+    ]
+    intelligence = {
+        "crossClassShield": {
+            "triggered": cross_class_triggered,
+            "score": max(high_conflict, 75) if cross_class_triggered else high_conflict,
+            "title": "跨类驰名保护扫描",
+            "explanation": "系统将同类近似与跨类高知名度标识线索分层展示；分值仅用于人工复核排序，不自动认定驰名或混淆。",
+            "protectedElements": [reference.get("title", "在先商标") for reference in trademark_references[:4]],
+            "suggestedAction": "对高分线索补做官方数据库检索并保留检索证据。"
+            if cross_class_triggered
+            else "正式提交前仍建议由目标市场代理人复核在先权利。",
+        },
+        "refusalHistory": {
+            "triggered": bool(relative_rules) or chinese_only,
+            "title": "驳回前科红牌",
+            "explanation": "该模块把文字显著性、近似候选和历史资料完整性作为需要人工确认的红牌信号。",
+            "redFlags": [
+                *(["中文品牌名缺少英文/越文辅助识别要素"] if chinese_only else []),
+                *(["存在文字或图形近似候选"] if relative_rules else []),
+            ]
+            or ["未发现明显驳回前科信号"],
+            "evidence": ["本地规则库命中记录", "在先商标底账引用", "建议补充官方检索截图"],
+        },
+        "culturalReview": {
+            "triggered": "越南" in target_markets and chinese_only,
+            "title": "文化禁忌审查",
+            "country": "、".join(str(item) for item in target_markets),
+            "rules": [
+                {
+                    "label": "越南文字显著性",
+                    "severity": "high" if chinese_only else "low",
+                    "note": "纯中文标识建议补充拉丁文字或越文识别要素，并由本地代理人复核。",
+                },
+                {
+                    "label": "公共标志与公序良俗",
+                    "severity": "medium",
+                    "note": "涉及国家标识、宗教或公共秩序的元素需要单独核验授权和适用限制。",
+                },
+            ],
+        },
+        "registrationStrategy": {
+            "route": registration_strategy.get("recommendedPath", "单国申请"),
+            "rationale": registration_strategy.get("reason", ""),
+            "marketCount": len(target_markets),
+            "timeline": strategy_timeline,
+            "costNotes": [
+                registration_strategy.get("costSaving", ""),
+                *registration_strategy.get("risks", []),
+            ],
+        },
+        "monitoring": [
+            {
+                "name": "NOIP 周公告抢注预警",
+                "cadence": "每周",
+                "source": "越南工业产权官方公报",
+                "actionWindow": "公告期内评估异议窗口",
+            },
+            {
+                "name": "TMview / WIPO 近似新申请",
+                "cadence": "每 7 天",
+                "source": "公开商标数据库",
+                "actionWindow": "发现线索后进入人工复核",
+            },
+        ],
+    }
 
     return {
         "brandName": req.get("brandName") or "",
@@ -852,6 +939,80 @@ def run_audit(req: dict[str, Any]) -> dict[str, Any]:
         "manualReviewRequired": manual_review_required,
         "radarData": vision.get("radarData", []),
         "matchedBrands": vision.get("matchedBrands", []),
+        "summary": {
+            "brandName": req.get("brandName") or "",
+            "niceClass": req.get("niceClass") or "",
+            "submitTime": datetime.now().isoformat(timespec="seconds"),
+            "riskLevel": risk_level,
+            "riskScore": score,
+            "overallResult": overall,
+        },
+        "absolute": {
+            "hasRisk": any(rule.get("applicable") for rule in absolute_rules),
+            "rejectionProbability": max(
+                (int(rule.get("similarityScore") or 0) for rule in absolute_rules),
+                default=0,
+            ),
+            "articles": [
+                {
+                    "article": rule.get("article", ""),
+                    "content": rule.get("content", ""),
+                    "applicable": bool(rule.get("applicable")),
+                    "note": rule.get("note", ""),
+                }
+                for rule in absolute_rules
+            ],
+        },
+        "relative": {
+            "hasRisk": any(rule.get("applicable") for rule in relative_rules) or bool(visual_candidates),
+            "conflicts": [
+                *[
+                    {
+                        "brandName": reference.get("title", "未知商标"),
+                        "registeredClass": reference.get("summary", ""),
+                        "registrationNo": reference.get("registrationNo", ""),
+                        "similarityType": relative_rules[index].get("similarityType", "")
+                        if index < len(relative_rules)
+                        else "",
+                        "similarityScore": relative_rules[index].get("similarityScore", 0)
+                        if index < len(relative_rules)
+                        else 0,
+                    }
+                    for index, reference in enumerate(trademark_references)
+                ],
+                *[
+                    {
+                        "brandName": item.get("name", "视觉复核候选"),
+                        "registeredClass": "视觉特征候选，非官方在先权利结论",
+                        "registrationNo": "visual-review",
+                        "similarityType": "OpenCV视觉相似候选",
+                        "similarityScore": item.get("matchScore", 0),
+                    }
+                    for item in visual_candidates
+                ],
+            ],
+            "precedents": [
+                {
+                    "caseName": reference.get("title", ""),
+                    "court": reference.get("source", ""),
+                    "date": reference.get("date", ""),
+                    "ruling": reference.get("summary", ""),
+                    "relevance": reference.get("relevance", ""),
+                }
+                for reference in case_references
+            ],
+        },
+        "visual": {
+            "radarData": vision.get("radarData", []),
+            "matchedBrands": vision.get("matchedBrands", []),
+            "analysisMode": "local-opencv",
+            "summary": "OpenCV 提取图形结构特征，结果仅作为人工复核排序信号。",
+        },
+        "intelligence": intelligence,
+        "advice": {
+            "recommendations": suggestions,
+            "documentPreview": _build_document_preview(req, risk_level, score, overall, hit_rules, references, suggestions),
+        },
         "documentPreview": _build_document_preview(req, risk_level, score, overall, hit_rules, references, suggestions),
         "applicationDocumentPreview": _build_application_document(req, hit_rules),
         "powerOfAttorneyPreview": _build_power_of_attorney_document(req),

@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AuditRequest(BaseModel):
@@ -11,8 +11,26 @@ class AuditRequest(BaseModel):
     niceClass: str = Field(..., description="尼斯分类，如 '第43类-餐饮服务'")
     goodsServices: str = Field(..., description="商品/服务描述，品牌主营业务和目标市场")
     targetMarkets: list[str] = Field(default_factory=lambda: ["越南"], description="目标市场列表")
+    targetCountries: list[str] = Field(default_factory=lambda: ["越南"], description="前端兼容字段：目标国家列表")
     hasChinaBase: bool = Field(False, description="是否已有中国基础商标注册/申请")
+    hasChinaBaseMark: bool = Field(False, description="前端兼容字段：是否已有中国基础商标")
+    operationStage: str = Field("pre-entry", max_length=32, description="当前出海阶段")
+    plannedMarkets: int = Field(1, ge=1, le=50, description="计划覆盖市场数量")
     logo: str = Field(..., description="Logo 图片 Base64 字符串（不含 data:image 前缀）")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_frontend_fields(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        countries = data.get("targetCountries") or data.get("targetMarkets") or ["越南"]
+        data["targetCountries"] = countries
+        data["targetMarkets"] = data.get("targetMarkets") or countries
+        if "hasChinaBase" not in data:
+            data["hasChinaBase"] = bool(data.get("hasChinaBaseMark", False))
+        data["hasChinaBaseMark"] = bool(data.get("hasChinaBaseMark", data["hasChinaBase"]))
+        return data
 
 
 class AuditResponse(BaseModel):
@@ -146,6 +164,12 @@ class AuditResult(BaseModel):
         default_factory=RegistrationStrategy,
         description="M4 跨域注册策略",
     )
+    summary: dict[str, Any] = Field(default_factory=dict, description="报告摘要")
+    absolute: dict[str, Any] = Field(default_factory=dict, description="绝对理由分析")
+    relative: dict[str, Any] = Field(default_factory=dict, description="相对理由分析")
+    visual: dict[str, Any] = Field(default_factory=dict, description="视觉分析")
+    intelligence: dict[str, Any] = Field(default_factory=dict, description="智能情报模块")
+    advice: dict[str, Any] = Field(default_factory=dict, description="处置建议与文书")
 
 
 class UnifiedResponse(BaseModel):

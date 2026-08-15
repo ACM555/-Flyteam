@@ -22,6 +22,11 @@ npm run dev -- --host 127.0.0.1
 - 后端接口文档：<http://127.0.0.1:8000/docs>
 - 健康检查：<http://127.0.0.1:8000/api/health>
 
+## VPS 上线
+
+生产部署、Nginx、systemd、HTTPS、数据持久化和备份清单见 [`deploy/README.md`](deploy/README.md)。
+上线前请在 `backend/.env` 配置 GLM Key、管理员密码、生产域名 CORS，并保持 `DEMO_MODE=false`。
+
 ## 测试与构建
 
 ```powershell

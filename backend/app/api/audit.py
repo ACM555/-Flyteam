@@ -1,67 +1,75 @@
-import time
+from __future__ import annotations
+
+import base64
+import binascii
+import re
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from app.api.auth import current_user
+from app.core.config import settings
+from app.database import create_task, get_task, update_task
 from app.models.audit import AuditRequest, AuditResponse, AuditResult, UnifiedResponse
 from app.services.audit_engine import run_audit
+from app.services.pdf_service import build_audit_pdf
+
 
 router = APIRouter(prefix="/audit", tags=["商标审查"])
 
-_task_store: dict[str, dict] = {}
+
+def _task_is_visible(task: dict, user: dict) -> bool:
+    """Keep task ids opaque: a non-owner sees the same response as a missing task."""
+
+    return user.get("role") == "superadmin" or task.get("user_id") == user.get("userId")
+
+
+def _validate_logo(logo: str) -> None:
+    payload = logo.split(",", 1)[1] if "," in logo and "base64" in logo[:80].lower() else logo
+    compact = re.sub(r"\s+", "", payload)
+    if not compact:
+        raise HTTPException(status_code=422, detail="Logo 图片不能为空")
+    try:
+        decoded = base64.b64decode(compact, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise HTTPException(status_code=422, detail="Logo 不是有效的 Base64 图片") from error
+    if not decoded:
+        raise HTTPException(status_code=422, detail="Logo 图片不能为空")
+    if len(decoded) > settings.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Logo 图片超过大小限制")
+
+
+def _elapsed_seconds(created_at: str) -> float:
+    try:
+        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        return max(0.0, (datetime.now(UTC) - created).total_seconds())
+    except (TypeError, ValueError):
+        return 0.0
 
 
 @router.post(
     "",
     response_model=UnifiedResponse,
+    status_code=202,
     summary="提交商标审查",
-    description="""
-接收品牌信息与 Logo 图片，创建审查任务。
-返回 taskId，前端通过 GET /api/audit/result/{taskId} 轮询获取结果。
-
-**处理流程：**
-1. 法条规则匹配（越南《工业产权法》第72-76条）
-2. 多模态视觉比对（OpenCV + 视觉大模型）
-3. 风险综合评估
-
-**预计耗时：** 3-5 秒（模拟阶段）
-""",
-    responses={
-        200: {
-            "description": "提交成功",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": 0,
-                        "message": "审查已提交",
-                        "data": {
-                            "taskId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                            "status": "pending",
-                            "message": "审查已提交，正在处理中",
-                        },
-                    },
-                },
-            },
-        },
-        422: {"description": "请求体校验失败"},
-    },
 )
-async def submit_audit(req: AuditRequest) -> UnifiedResponse:
-    """提交商标审查任务，并返回用于轮询的 taskId。"""
+async def submit_audit(
+    req: AuditRequest,
+    user: dict = Depends(current_user),
+) -> UnifiedResponse:
+    """Create a durable, user-owned audit task."""
 
+    _validate_logo(req.logo)
     task_id = str(uuid4())
-    created_at = time.time()
-
-    _task_store[task_id] = {
-        "request": req.model_dump(),
-        "status": "pending",
-        "currentStep": 0,
-        "progress": 0,
-        "created_at": created_at,
-        "result": None,
-    }
-
-    response = AuditResponse(taskId=task_id, status="pending", message="审查已提交，正在处理中")
+    create_task(task_id, req.model_dump(), user["userId"])
+    response = AuditResponse(
+        taskId=task_id,
+        status="pending",
+        message="审查已提交，正在处理中",
+    )
     return UnifiedResponse(code=0, message="审查已提交", data=response.model_dump())
 
 
@@ -69,123 +77,76 @@ async def submit_audit(req: AuditRequest) -> UnifiedResponse:
     "/result/{taskId}",
     response_model=UnifiedResponse,
     summary="获取审查结果",
-    description="""
-轮询审查结果。前端每 2 秒调用一次。
-
-**状态流转：**
-- pending → processing（step 0-2）→ done / error
-- done 时返回完整审查结果（hitRules / references / suggestions / radarData 等）
-- error 时返回 errorMessage
-
-**轮询策略：**
-- 间隔：2 秒
-- 超时：60 秒未完成视为超时
-- done 后停止轮询
-""",
-    responses={
-        200: {
-            "description": "审查结果",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "code": 0,
-                        "message": "success",
-                        "data": {
-                            "taskId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                            "status": "done",
-                            "currentStep": 2,
-                            "progress": 100,
-                            "brandName": "墨兰奶白",
-                            "niceClass": "第43类-餐饮服务",
-                            "goodsServices": "新茶饮品牌，主营奶茶饮品，目标市场越南",
-                            "riskLevel": "high",
-                            "riskScore": 82,
-                            "overallResult": "存在跨类目驰名商誉攀附风险，建议暂缓提交。",
-                            "hitRules": [
-                                {
-                                    "ruleType": "relative",
-                                    "article": "越南《工业产权法》第74.2(c)条",
-                                    "content": "与在越南已注册的驰名商标构成混淆性近似",
-                                    "applicable": True,
-                                    "similarityType": "图形相似-四叶花卉几何结构",
-                                    "similarityScore": 87,
-                                    "note": "四叶花卉图形与Louis Vuitton几何特征高度近似",
-                                },
-                            ],
-                            "references": [
-                                {
-                                    "refType": "trademark",
-                                    "title": "Louis Vuitton",
-                                    "source": "WIPO Madrid Monitor",
-                                    "date": "2019-03-15",
-                                    "registrationNo": "4VN-2019-00XXX",
-                                    "summary": "全类注册（含第43类餐饮服务）",
-                                    "relevance": "图形几何构图高度近似",
-                                },
-                            ],
-                            "suggestions": [
-                                {
-                                    "priority": "P0",
-                                    "title": "立即停止使用四叶花卉图形",
-                                    "description": "暂停当前图形在越南市场使用和申请。",
-                                },
-                            ],
-                            "manualReviewRequired": True,
-                        },
-                    },
-                },
-            },
-        },
-        404: {
-            "description": "任务不存在",
-            "content": {
-                "application/json": {
-                    "example": {"code": 404, "message": "任务不存在", "data": None},
-                },
-            },
-        },
-    },
 )
-async def get_audit_result(taskId: str) -> UnifiedResponse:
-    """根据 taskId 轮询审查状态；完成后返回本地规则引擎审查报告。"""
+async def get_audit_result(taskId: str, user: dict = Depends(current_user)) -> UnifiedResponse:
+    """Poll a task; its state survives an API process restart."""
 
-    task = _task_store.get(taskId)
-    if not task:
-        return UnifiedResponse(code=404, message="任务不存在", data=None)
+    task = get_task(taskId)
+    if not task or not _task_is_visible(task, user):
+        raise HTTPException(status_code=404, detail="任务不存在")
 
-    elapsed = time.time() - task["created_at"]
-
-    if elapsed < 1:
-        task["status"] = "pending"
-        task["currentStep"] = 0
-        task["progress"] = 10
-    elif elapsed < 2:
-        task["status"] = "processing"
-        task["currentStep"] = 0
-        task["progress"] = 33
-    elif elapsed < 3:
-        task["status"] = "processing"
-        task["currentStep"] = 1
-        task["progress"] = 66
-    elif elapsed < 4:
-        task["status"] = "processing"
-        task["currentStep"] = 2
-        task["progress"] = 90
-    else:
-        task["status"] = "done"
-        task["currentStep"] = 2
-        task["progress"] = 100
-        if task["result"] is None:
-            task["result"] = run_audit(task["request"])
+    if task["status"] not in {"done", "error"}:
+        elapsed = _elapsed_seconds(task["created_at"])
+        if elapsed < 1:
+            update_task(taskId, status="pending", current_step=0, progress=10)
+        elif elapsed < 2:
+            update_task(taskId, status="processing", current_step=0, progress=33)
+        elif elapsed < 3:
+            update_task(taskId, status="processing", current_step=1, progress=66)
+        elif elapsed < 4:
+            update_task(taskId, status="processing", current_step=2, progress=90)
+        else:
+            try:
+                update_task(taskId, status="processing", current_step=2, progress=95)
+                result = run_audit(task["request"])
+                advice = result.setdefault("advice", {})
+                advice["documentDownloadUrl"] = f"/api/audit/report/{taskId}/pdf"
+                update_task(
+                    taskId,
+                    status="done",
+                    current_step=2,
+                    progress=100,
+                    result=result,
+                    error_message="",
+                )
+            except Exception as error:
+                update_task(
+                    taskId,
+                    status="error",
+                    progress=100,
+                    error_message=str(error)[:500],
+                )
+        task = get_task(taskId) or task
 
     result = {
         "taskId": taskId,
         "status": task["status"],
-        "currentStep": task["currentStep"],
+        "currentStep": min(task["current_step"], 2),
         "progress": task["progress"],
     }
     if task["status"] == "done" and task["result"]:
         result.update(task["result"])
+    if task["status"] == "error":
+        result["errorMessage"] = task["error_message"] or "审查任务处理失败"
 
     AuditResult.model_validate(result)
     return UnifiedResponse(code=0, message="success", data=result)
+
+
+@router.get("/report/{taskId}/pdf", response_class=Response, summary="下载审查 PDF 报告")
+async def download_audit_pdf(taskId: str, user: dict = Depends(current_user)) -> Response:
+    """Generate a PDF only for a completed task visible to the current user."""
+
+    task = get_task(taskId)
+    if not task or not _task_is_visible(task, user):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task["status"] != "done" or not task.get("result"):
+        raise HTTPException(status_code=409, detail="审查尚未完成，暂时无法下载报告")
+
+    content = build_audit_pdf({**task["result"], "taskId": taskId})
+    filename = f"outbound-guard-{taskId[:8]}.pdf"
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

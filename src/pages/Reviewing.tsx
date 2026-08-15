@@ -8,7 +8,6 @@ import { Button, Card, Progress, Result, Space, Spin, Steps, Typography } from '
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { getAuditResult } from '@/api/audit'
-import { getCurrentTaskId, setCurrentTaskId } from '@/utils/auditHistory'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -28,15 +27,23 @@ const reviewSteps = [
     description: 'OpenCV 图像预处理 + 视觉大模型几何特征对齐',
   },
   {
+    title: '跨类驰护扫描',
+    description: '识别国际驰名品牌权利族、公共纹样边界与驳回前科红牌',
+  },
+  {
+    title: '文化禁忌审查',
+    description: '检查越南纯汉字、国旗国徽、公告异议窗口和东盟公序良俗差异',
+  },
+  {
     title: '风险综合评估',
-    description: '汇总法条 + 视觉结果，生成合规风险报告',
+    description: '汇总法条、视觉、跨类、策略结果，生成合规风险报告',
   },
 ]
 
 function Reviewing() {
   const navigate = useNavigate()
   const location = useLocation()
-  const taskId = (location.state as ReviewingRouteState | null)?.taskId ?? getCurrentTaskId()
+  const taskId = (location.state as ReviewingRouteState | null)?.taskId
   const [currentStep, setCurrentStep] = useState(0)
   const [status, setStatus] = useState<ReviewingStatus>('loading')
   const [errorMsg, setErrorMsg] = useState('')
@@ -60,11 +67,9 @@ function Reviewing() {
   const poll = useCallback(async () => {
     if (!taskId) {
       setStatus('error')
-      setErrorMsg('当前没有可查看的审查任务，请先提交品牌信息。')
+      setErrorMsg('缺少任务ID，请从提交页重新进入')
       return
     }
-
-    setCurrentTaskId(taskId)
 
     if (Date.now() - startTimeRef.current > 60000) {
       clearTimers()
@@ -103,7 +108,7 @@ function Reviewing() {
     } catch {
       clearTimers()
       setStatus('error')
-      setErrorMsg('任务不存在或后端服务已重启，请返回提交页重新提交。')
+      setErrorMsg('网络请求失败，请确认后端服务已启动')
     }
   }, [clearTimers, navigate, taskId])
 
@@ -152,7 +157,7 @@ function Reviewing() {
             重新审查
           </Button>,
           <Button key="submit" onClick={() => navigate('/submit')}>
-            重新提交
+            返回修改
           </Button>,
         ]}
       />
@@ -170,7 +175,7 @@ function Reviewing() {
             重新审查
           </Button>,
           <Button key="submit" onClick={() => navigate('/submit')}>
-            重新提交
+            返回提交页
           </Button>,
         ]}
       />

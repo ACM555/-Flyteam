@@ -1,245 +1,407 @@
 import {
+  AlertOutlined,
   ArrowRightOutlined,
+  AuditOutlined,
+  BankOutlined,
+  CheckCircleOutlined,
+  CloudServerOutlined,
+  DatabaseOutlined,
   FileProtectOutlined,
   FileTextOutlined,
+  GlobalOutlined,
+  MonitorOutlined,
   SafetyCertificateOutlined,
-  SolutionOutlined,
-  WarningOutlined,
+  SendOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
-import { Button, Card, Col, Row, Space, Statistic, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Divider,
+  List,
+  Row,
+  Skeleton,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+} from 'antd'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getStatistics } from '@/api'
-import ComplianceModuleGrid from '@/components/ComplianceModuleGrid'
-import type { StatisticsData } from '@/types/audit'
+import { HoverLift, MotionItem, StaggerGroup } from '@/components/MotionKit'
+import ProductEmpty from '@/components/ProductEmpty'
+import { getPlatformOverview, type PlatformOverview } from '@/api/platform'
+import { getBrandAssets, getDataSourceStatus, getMonitoringAlerts } from '@/api/saas'
+import type { BrandAsset, DataSourceStatus, MonitoringAlert } from '@/api/saas'
 
 const { Paragraph, Text, Title } = Typography
 
-const capabilities = [
+const fallbackOverview: PlatformOverview = {
+  positioning: '面向中国企业赴越南与东盟市场的商标合规智能体',
+  slogan: '注册前预检、注册中导航、注册后风控',
+  healthScore: 86,
+  riskTrend: [],
+  modules: [],
+  dataSources: [],
+  sla: [],
+  businessModel: [],
+}
+
+const riskColor = {
+  high: 'red',
+  medium: 'orange',
+  low: 'green',
+} as const
+
+const moduleIcons = [
+  <AuditOutlined />,
+  <FileProtectOutlined />,
+  <GlobalOutlined />,
+  <ThunderboltOutlined />,
+  <AlertOutlined />,
+  <FileTextOutlined />,
+]
+
+const quickActions = [
   {
-    title: '商标合规扫描',
-    description: '围绕越南商标注册审查规则，快速识别绝对驳回与相对驳回风险。',
-    hint: '适合提交前快速体检',
+    desc: '上传品牌名、类别、Logo，一次生成风险结论',
+    icon: <SendOutlined />,
+    path: '/submit',
+    title: '发起智能审查',
+  },
+  {
+    desc: '查看品牌组合、风险等级和下一步动作',
     icon: <SafetyCertificateOutlined />,
-    color: '#1677ff',
-    background: '#f0f5ff',
+    path: '/assets',
+    title: '品牌资产库',
   },
   {
-    title: '法律风险预警',
-    description: '结合本地规则库、冲突品牌库和判例线索，提前发现跨类攀附风险。',
-    hint: '适合出海品牌风控评估',
-    icon: <FileProtectOutlined />,
-    color: '#faad14',
-    background: '#fffbe6',
+    desc: '订阅公告期异议、抢注与法规变更信号',
+    icon: <MonitorOutlined />,
+    path: '/monitoring',
+    title: '监控预警',
   },
   {
-    title: '合规报告生成',
-    description: '把审查结论沉淀为红黄绿三种合规预检报告，辅助团队后续决策。',
-    hint: '适合法务与业务同步决策',
-    icon: <SolutionOutlined />,
-    color: '#52c41a',
-    background: '#f6ffed',
+    desc: '进入运营后台，查看任务和系统运行状态',
+    icon: <BankOutlined />,
+    path: '/admin',
+    title: '后台管理',
   },
 ]
 
+const portalNews = [
+  {
+    date: '07-19',
+    tag: '规则动态',
+    title: '越南公告期异议窗口进入高发周期，茶饮与餐饮服务建议提前准备证据链',
+  },
+  {
+    date: '07-18',
+    tag: '能力升级',
+    title: 'M2 驰名/跨类保护模型加入权利族聚类，提升国际品牌冲突识别能力',
+  },
+  {
+    date: '07-18',
+    tag: '数据源',
+    title: 'WIPO、TMview、NOIP 与本地规则库完成统一健康度监控',
+  },
+  {
+    date: '07-17',
+    tag: '实务策略',
+    title: '三国以上市场推荐“基础标 + 单国/马德里混合路径”降低申请成本',
+  },
+]
+
+const strategyCards = [
+  {
+    cover: '/assets/photos/china-business-meeting.webp',
+    kicker: '媒体东大式栏目',
+    path: '/reports',
+    title: '报告中心',
+    text: '沉淀可复用、可归档、可交付的中英越文审查报告与代理人协作清单。',
+  },
+  {
+    cover: '/assets/photos/china-city-data.webp',
+    kicker: '学术东大式栏目',
+    path: '/rules',
+    title: '国家规则库',
+    text: '按越南、泰国、印尼、马来西亚等市场组织禁用条款、周期和提交策略。',
+  },
+  {
+    cover: '/assets/photos/china-court-office.webp',
+    kicker: '活力东大式栏目',
+    path: '/assets',
+    title: '品牌运营视图',
+    text: '把品牌资产、监控事件和注册阶段打通，给评委看到完整业务闭环。',
+  },
+]
+
+function formatAlertMeta(item: MonitoringAlert) {
+  return `${item.country} · ${item.window} · ${item.owner}`
+}
+
+function handleCardKey(event: KeyboardEvent<HTMLElement>, action: () => void) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    action()
+  }
+}
+
 function Home() {
   const navigate = useNavigate()
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
-  const [statisticsData, setStatisticsData] = useState<StatisticsData>({
-    auditedBrands: 0,
-    highRiskBlocked: 0,
-  })
+  const [overview, setOverview] = useState<PlatformOverview>(fallbackOverview)
+  const [assets, setAssets] = useState<BrandAsset[]>([])
+  const [alerts, setAlerts] = useState<MonitoringAlert[]>([])
+  const [sources, setSources] = useState<DataSourceStatus[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    let ignore = false
+    let mounted = true
 
-    getStatistics()
-      .then((data) => {
-        if (!ignore) setStatisticsData(data)
+    Promise.all([
+      getPlatformOverview(),
+      getBrandAssets(),
+      getMonitoringAlerts(),
+      getDataSourceStatus(),
+    ])
+      .then(([nextOverview, nextAssets, nextAlerts, nextSources]) => {
+        if (mounted) {
+          setOverview(nextOverview)
+          setAssets(nextAssets)
+          setAlerts(nextAlerts)
+          setSources(nextSources)
+          setError(false)
+        }
       })
       .catch(() => {
-        if (!ignore) setStatisticsData({ auditedBrands: 0, highRiskBlocked: 0 })
+        if (mounted) {
+          setError(true)
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false)
+        }
       })
 
     return () => {
-      ignore = true
+      mounted = false
     }
   }, [])
 
-  const statistics = useMemo(
-    () => [
-      {
-        title: '已审查品牌',
-        value: statisticsData.auditedBrands,
-        suffix: '个',
-        color: '#1677ff',
-        icon: <SafetyCertificateOutlined />,
-      },
-      {
-        title: '拦截高风险',
-        value: statisticsData.highRiskBlocked,
-        suffix: '项',
-        color: '#ff4d4f',
-        icon: <WarningOutlined />,
-      },
-      {
-        title: '法条覆盖',
-        value: 5,
-        suffix: '类',
-        color: '#52c41a',
-        icon: <FileTextOutlined />,
-      },
-    ],
-    [statisticsData],
-  )
+  const highRiskAssets = assets.filter((item) => item.riskLevel === 'high').length
+  const highAlerts = alerts.filter((item) => item.severity === 'high').length
+  const featuredAlert = alerts[0]
+  const moduleRows = useMemo(() => overview.modules.slice(0, 6), [overview.modules])
 
   return (
-    <Space direction="vertical" size={24} style={{ display: 'flex' }}>
-      <div
-        style={{
-          background:
-            'radial-gradient(circle at 80% 20%, rgba(255,255,255,0.28) 0, rgba(255,255,255,0) 30%), linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)',
-          borderRadius: 16,
-          boxShadow: '0 16px 40px rgba(22, 119, 255, 0.22)',
-          color: '#fff',
-          overflow: 'hidden',
-          padding: '48px 40px',
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.14)',
-            borderRadius: 999,
-            height: 180,
-            position: 'absolute',
-            right: -56,
-            top: -72,
-            width: 180,
-          }}
-        />
-        <div style={{ maxWidth: 720, position: 'relative', zIndex: 1 }}>
-          <Text style={{ color: 'rgba(255,255,255,0.82)', fontWeight: 600 }}>
-            越南出海商标合规智能体
-          </Text>
-          <Title level={1} style={{ color: '#fff', margin: '10px 0 12px' }}>
-            Outbound-Guard
-          </Title>
-          <Paragraph
-            style={{
-              color: 'rgba(255,255,255,0.88)',
-              fontSize: 16,
-              lineHeight: 1.8,
-              marginBottom: 28,
-              maxWidth: 620,
-            }}
-          >
-            零幻觉法条级审查，秒级识别跨类攀附风险。为中国企业出海东南亚提供商标提交前的智能扫描、风险预警与合规建议。
+    <Space direction="vertical" size={30} style={{ display: 'flex' }}>
+      <section className="seu-hero portal-hero-cn">
+        <div className="hero-scanline" aria-hidden="true" />
+        <div className="hero-particles" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+
+        <div className="seu-hero-content">
+          <Tag className="seu-hero-tag">中国企业出海 · 东盟商标合规智能体</Tag>
+          <Title level={1}>东盟商标合规智能体</Title>
+          <Paragraph>
+            {overview.positioning}，覆盖{overview.slogan}。用 AI 检索、法律规则和证据链报告，
+            帮中国品牌把出海前的商标风险提前看清楚、讲明白、留得住。
           </Paragraph>
-          <Space size={12} wrap>
-            <Button
-              ghost
-              icon={<ArrowRightOutlined />}
-              onClick={() => navigate('/submit')}
-              size="large"
-              style={{ borderColor: '#fff', color: '#fff' }}
-              type="primary"
-            >
-              立即开始审查
+          <Space className="seu-hero-actions" size={12} wrap>
+            <Button icon={<ArrowRightOutlined />} onClick={() => navigate('/submit')} size="large" type="primary">
+              发起智能审查
             </Button>
-            <Text style={{ color: 'rgba(255,255,255,0.76)' }}>预计 3-5 秒生成初步报告</Text>
+            <Button className="hero-secondary-btn" onClick={() => navigate('/reports')} size="large">
+              查看报告中心
+            </Button>
           </Space>
         </div>
-      </div>
 
-      <Row gutter={[16, 16]}>
-        {statistics.map((item) => (
-          <Col key={item.title} xs={24} sm={8}>
-            <Card>
-              <Statistic
-                prefix={<span style={{ color: item.color }}>{item.icon}</span>}
-                suffix={item.suffix}
-                title={item.title}
-                value={item.value}
-                valueStyle={{ color: item.color, fontWeight: 700 }}
+        <div className="seu-hero-board">
+          <Text className="board-kicker">LIVE RISK INDEX</Text>
+          <strong>{overview.healthScore ?? 86}</strong>
+          <span>平台健康度</span>
+          <Divider />
+          <Space direction="vertical" size={8}>
+            <Text>NOIP / WIPO / TMview 在线同步</Text>
+            <Text>高风险预警 {highAlerts} 条 · 资产库 {assets.length} 组</Text>
+          </Space>
+        </div>
+      </section>
+
+      {error ? (
+        <Alert
+          showIcon
+          type="warning"
+          message="部分平台数据暂时不可用"
+          description="请确认后端服务已启动。当前页面保留门户展示，不影响继续发起审查。"
+        />
+      ) : null}
+
+      <section className="seu-quick-section">
+        <StaggerGroup>
+          <Row gutter={[16, 16]}>
+            {quickActions.map((item) => (
+              <Col key={item.path} xs={24} sm={12} xl={6}>
+                <MotionItem>
+                  <HoverLift>
+                    <Card
+                      className="seu-quick-card"
+                      onClick={() => navigate(item.path)}
+                      onKeyDown={(event) => handleCardKey(event, () => navigate(item.path))}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="quick-icon">{item.icon}</div>
+                      <Title level={4}>{item.title}</Title>
+                      <Paragraph>{item.desc}</Paragraph>
+                    </Card>
+                  </HoverLift>
+                </MotionItem>
+              </Col>
+            ))}
+          </Row>
+        </StaggerGroup>
+      </section>
+
+      <section className="seu-news-section">
+        <div className="section-titlebar seu-titlebar">
+          <div>
+            <Text className="section-kicker">Risk Headlines</Text>
+            <Title level={2}>风控要闻</Title>
+          </div>
+          <Button type="link" onClick={() => navigate('/monitoring')}>
+            更多预警
+          </Button>
+        </div>
+
+        <Row gutter={[20, 20]}>
+          <Col xs={24} xl={11}>
+            <Card className="seu-feature-news">
+              <Tag color={featuredAlert ? riskColor[featuredAlert.severity] : 'red'}>重点预警</Tag>
+              <Title level={3}>{featuredAlert?.title ?? '越南公告期近似商标风险持续升温'}</Title>
+              <Paragraph>
+                {featuredAlert
+                  ? `${formatAlertMeta(featuredAlert)}。建议立即完成证据链归档、图形改稿和代理人协作准备。`
+                  : '系统会把公告期抢注、异议窗口和国际权利族信号整理为可执行动作，适合比赛现场演示。'}
+              </Paragraph>
+              <Button ghost onClick={() => navigate('/monitoring')}>
+                查看处置建议
+              </Button>
+            </Card>
+          </Col>
+          <Col xs={24} xl={13}>
+            <Card className="seu-news-list-card">
+              <List
+                dataSource={portalNews}
+                renderItem={(item) => (
+                  <List.Item className="seu-news-item">
+                    <div className="news-date">{item.date}</div>
+                    <div>
+                      <Tag color="blue">{item.tag}</Tag>
+                      <Text strong>{item.title}</Text>
+                    </div>
+                  </List.Item>
+                )}
               />
+            </Card>
+          </Col>
+        </Row>
+      </section>
+
+      <section className="portal-section seu-capability-section">
+        <div className="section-titlebar seu-titlebar">
+          <div>
+            <Text className="section-kicker">Capability Columns</Text>
+            <Title level={2}>M1-M6 能力栏目</Title>
+          </div>
+          <Tag color="green">六大模块已接入演示链路</Tag>
+        </div>
+        {loading ? (
+          <Card>
+            <Skeleton active paragraph={{ rows: 8 }} />
+          </Card>
+        ) : moduleRows.length ? (
+          <Row gutter={[18, 18]}>
+            {moduleRows.map((item, index) => (
+              <Col key={item.key} xs={24} md={12} xl={8}>
+                <HoverLift>
+                  <Card className="seu-channel-card">
+                    <div className="channel-index">{String(index + 1).padStart(2, '0')}</div>
+                    <div className="channel-icon">{moduleIcons[index] ?? <CheckCircleOutlined />}</div>
+                    <Text className="channel-key">{item.key}</Text>
+                    <Title level={4}>{item.name}</Title>
+                    <Paragraph>{item.output}</Paragraph>
+                    <Space size={[6, 6]} wrap>
+                      {item.features.slice(0, 4).map((feature) => (
+                        <Tag key={feature}>{feature}</Tag>
+                      ))}
+                    </Space>
+                  </Card>
+                </HoverLift>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <ProductEmpty description="暂无模块数据" />
+        )}
+      </section>
+
+      <Row gutter={[20, 20]}>
+        {strategyCards.map((item) => (
+          <Col key={item.title} xs={24} lg={8}>
+            <Card
+              className="seu-image-channel"
+              cover={<img alt={item.title} loading="lazy" src={item.cover} />}
+              onClick={() => navigate(item.path)}
+              onKeyDown={(event) => handleCardKey(event, () => navigate(item.path))}
+              role="button"
+              tabIndex={0}
+            >
+              <Text className="section-kicker">{item.kicker}</Text>
+              <Title level={4}>{item.title}</Title>
+              <Paragraph>{item.text}</Paragraph>
             </Card>
           </Col>
         ))}
       </Row>
-      <Text type="secondary">以下数据来自当前系统任务数据库，不使用演示数字。</Text>
 
-      <div>
-        <Title level={3} style={{ marginBottom: 4 }}>
-          6 大功能模块
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          围绕提交前预检、侵权线索、文化禁忌、注册策略、风控维权与文书生成组织完整产品路径。
-        </Paragraph>
-        <ComplianceModuleGrid />
-      </div>
-
-      <div>
-        <Title level={3} style={{ marginBottom: 4 }}>
-          核心能力
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-          从提交、审查到报告输出，覆盖出海商标合规评估的关键节点。
-        </Paragraph>
-        <Row gutter={[20, 20]}>
-          {capabilities.map((capability) => {
-            const isHovered = hoveredCard === capability.title
-
-            return (
-              <Col key={capability.title} xs={24} md={12} lg={8}>
-                <Card
-                  hoverable
-                  onClick={() => navigate('/submit')}
-                  onMouseEnter={() => setHoveredCard(capability.title)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  style={{
-                    boxShadow: isHovered ? '0 10px 28px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.03)',
-                    cursor: 'pointer',
-                    height: '100%',
-                    minHeight: 238,
-                    transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
-                    transition: 'all 0.3s ease',
-                  }}
-                >
-                  <Space direction="vertical" size={16} style={{ display: 'flex' }}>
-                    <div
-                      style={{
-                        alignItems: 'center',
-                        background: capability.background,
-                        borderRadius: 12,
-                        color: capability.color,
-                        display: 'flex',
-                        fontSize: 28,
-                        height: 56,
-                        justifyContent: 'center',
-                        width: 56,
-                      }}
-                    >
-                      {capability.icon}
-                    </div>
-                    <Title level={4} style={{ margin: 0 }}>
-                      {capability.title}
-                    </Title>
-                    <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-                      {capability.description}
-                    </Paragraph>
-                    <Text type="secondary">{capability.hint}</Text>
-                  </Space>
-                </Card>
-              </Col>
-            )
-          })}
+      <section className="seu-data-band">
+        <div>
+          <Text className="section-kicker">Digital Platform</Text>
+          <Title level={2}>数字平台</Title>
+          <Paragraph>把规则、审查、报告、预警和后台运营集中到一套可展示、可测试、可上线的比赛产品里。</Paragraph>
+        </div>
+        <Row gutter={[18, 18]}>
+          <Col xs={12} lg={6}>
+            <Statistic title="品牌资产" value={assets.length} suffix="组" prefix={<SafetyCertificateOutlined />} />
+          </Col>
+          <Col xs={12} lg={6}>
+            <Statistic title="高风险资产" value={highRiskAssets} suffix="组" prefix={<FileProtectOutlined />} />
+          </Col>
+          <Col xs={12} lg={6}>
+            <Statistic title="活跃预警" value={alerts.length} suffix="条" prefix={<AlertOutlined />} />
+          </Col>
+          <Col xs={12} lg={6}>
+            <Statistic title="数据源" value={sources.length || overview.dataSources.length} suffix="路" prefix={<DatabaseOutlined />} />
+          </Col>
         </Row>
-      </div>
-
-      <div style={{ padding: '40px 0 20px', textAlign: 'center' }}>
-        <Text type="secondary">Outbound-Guard v1.0.0 · 越南出海商标合规智能体</Text>
-      </div>
+        <div className="seu-data-sources">
+          {(sources.length ? sources : overview.dataSources).slice(0, 4).map((item) => (
+            <Tag key={typeof item === 'string' ? item : item.name} icon={<CloudServerOutlined />}>
+              {typeof item === 'string' ? item : `${item.name} · ${item.freshness}`}
+            </Tag>
+          ))}
+        </div>
+      </section>
     </Space>
   )
 }

@@ -13,7 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
+    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**', 'output/**', 'backend/**', '.pytest_cache/**'],
     fileParallelism: false,
     environment: 'jsdom',
     maxWorkers: 1,

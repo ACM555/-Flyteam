@@ -10,7 +10,13 @@ const request = axios.create({
 })
 
 request.interceptors.request.use(
-  (config) => config,
+  (config) => {
+    const token = window.localStorage.getItem('outbound_guard_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
   (error) => Promise.reject(error),
 )
 
@@ -29,16 +35,23 @@ request.interceptors.response.use(
   (error) => {
     if (error.response) {
       const status = error.response.status
+      const backendMessage = error.response.data?.message || error.response.data?.detail
       const msg =
-        status === 500
+        backendMessage ||
+        (status === 500
           ? '服务器内部错误'
           : status === 404
             ? '接口不存在'
+            : status === 409
+              ? '数据已存在，请更换后重试'
+              : status === 422
+                ? '提交信息不符合要求，请检查表单'
             : status === 429
               ? '请求过于频繁，请稍后重试'
-              : `网络错误 (${status})`
+              : `网络错误 (${status})`)
 
       message.error(msg)
+      error.message = msg
     } else if (error.code === 'ECONNABORTED') {
       message.error('请求超时，请检查网络后重试')
     } else {
