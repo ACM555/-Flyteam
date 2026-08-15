@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
 
 from app.core.config import settings
 from app.models.assistant import AssistantSource
@@ -53,13 +52,13 @@ class RetrievalService:
 
     def store_text_document(self, user_id: str, filename: str, content: str) -> str:
         safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", filename) or "document.txt"
-        directory = Path(settings.ASSISTANT_KNOWLEDGE_DIR) / user_id
+        directory = settings.resolve_path(settings.ASSISTANT_KNOWLEDGE_DIR) / user_id
         directory.mkdir(parents=True, exist_ok=True)
         (directory / safe_name).write_text(content, encoding="utf-8")
         return f"tenant-{user_id}-{safe_name}"
 
     def _tenant_documents(self, user_id: str) -> list[KnowledgeDocument]:
-        directory = Path(settings.ASSISTANT_KNOWLEDGE_DIR) / user_id
+        directory = settings.resolve_path(settings.ASSISTANT_KNOWLEDGE_DIR) / user_id
         if not directory.exists():
             return []
         documents: list[KnowledgeDocument] = []

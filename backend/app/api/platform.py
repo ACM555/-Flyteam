@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.auth import admin_user, current_user
+from app.core.config import settings
 from app.database import get_admin_statistics, get_system_status, get_task, list_audit_tasks, list_users
 from app.services.platform_service import (
     build_report_center,
@@ -47,8 +48,9 @@ def data_source_status(_: dict = Depends(current_user)) -> dict:
 
 
 @router.get("/reports")
-def report_center(_: dict = Depends(current_user)) -> dict:
-    return _success(build_report_center([]))
+def report_center(user: dict = Depends(current_user)) -> dict:
+    tasks = list_audit_tasks() if user.get("role") == "superadmin" else list_audit_tasks(user["userId"])
+    return _success(build_report_center(tasks, include_demo=settings.DEMO_MODE))
 
 
 @router.get("/admin/statistics")

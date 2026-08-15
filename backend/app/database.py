@@ -29,6 +29,7 @@ def init_database() -> None:
             """
             CREATE TABLE IF NOT EXISTS audit_tasks (
                 task_id TEXT PRIMARY KEY,
+                user_id TEXT,
                 status TEXT NOT NULL,
                 current_step INTEGER NOT NULL,
                 progress INTEGER NOT NULL,
@@ -40,8 +41,17 @@ def init_database() -> None:
             )
             """
         )
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(audit_tasks)").fetchall()
+        }
+        if "user_id" not in columns:
+            connection.execute("ALTER TABLE audit_tasks ADD COLUMN user_id TEXT")
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_tasks_created_at ON audit_tasks(created_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_tasks_user_id ON audit_tasks(user_id)"
         )
         connection.execute(
             """
@@ -65,9 +75,11 @@ def init_database() -> None:
             )
             """
         )
-        if not connection.execute(
-            "SELECT 1 FROM users WHERE username = ?", (settings.SUPERADMIN_USERNAME,)
-        ).fetchone():
+        admin_row = connection.execute(
+            "SELECT user_id, password_hash FROM users WHERE username = ?",
+            (settings.SUPERADMIN_USERNAME,),
+        ).fetchone()
+        if admin_row is None:
             connection.execute(
                 """
                 INSERT INTO users (
@@ -78,6 +90,31 @@ def init_database() -> None:
                     secrets.token_hex(16),
                     settings.SUPERADMIN_USERNAME,
                     _hash_password(settings.SUPERADMIN_PASSWORD),
+                    _now(),
+                ),
+            )
+        if admin_row is not None and not _verify_password(
+            settings.SUPERADMIN_PASSWORD,
+            admin_row["password_hash"],
+        ):
+            connection.execute(
+                "UPDATE users SET password_hash = ? WHERE user_id = ?",
+                (_hash_password(settings.SUPERADMIN_PASSWORD), admin_row["user_id"]),
+            )
+        if settings.DEMO_MODE and settings.DEMO_PASSWORD and not connection.execute(
+            "SELECT 1 FROM users WHERE username = ?", (settings.DEMO_USERNAME,)
+        ).fetchone():
+            connection.execute(
+                """
+                INSERT INTO users (
+                    user_id, username, password_hash, role, company, created_at
+                ) VALUES (?, ?, ?, 'user', ?, ?)
+                """,
+                (
+                    secrets.token_hex(16),
+                    settings.DEMO_USERNAME,
+                    _hash_password(settings.DEMO_PASSWORD),
+                    settings.DEMO_COMPANY,
                     _now(),
                 ),
             )
@@ -167,17 +204,27 @@ def delete_session(token: str) -> None:
         connection.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
 
 
-def create_task(task_id: str, request_data: dict[str, Any]) -> None:
+def create_task(
+    task_id: str,
+    request_data: dict[str, Any],
+    user_id: str | None = None,
+) -> None:
     timestamp = _now()
     with _connect() as connection:
         connection.execute(
             """
             INSERT INTO audit_tasks (
-                task_id, status, current_step, progress, request_json,
+                task_id, user_id, status, current_step, progress, request_json,
                 result_json, error_message, created_at, updated_at
-            ) VALUES (?, 'pending', 0, 0, ?, NULL, NULL, ?, ?)
+            ) VALUES (?, ?, 'pending', 0, 0, ?, NULL, NULL, ?, ?)
             """,
-            (task_id, json.dumps(request_data, ensure_ascii=False), timestamp, timestamp),
+            (
+                task_id,
+                user_id,
+                json.dumps(request_data, ensure_ascii=False),
+                timestamp,
+                timestamp,
+            ),
         )
 
 
@@ -243,17 +290,22 @@ def get_statistics() -> dict[str, int]:
     return {"auditedBrands": int(total), "highRiskBlocked": int(high_risk)}
 
 
-def list_audit_tasks(limit: int = 50) -> list[dict[str, Any]]:
+def list_audit_tasks(user_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     with _connect() as connection:
         rows = connection.execute(
             """
-            SELECT task_id, status, current_step, progress, request_json,
-                   result_json, error_message, created_at, updated_at
+            SELECT audit_tasks.task_id, audit_tasks.user_id, audit_tasks.status,
+                   audit_tasks.current_step, audit_tasks.progress, audit_tasks.request_json,
+                   audit_tasks.result_json, audit_tasks.error_message,
+                   audit_tasks.created_at, audit_tasks.updated_at,
+                   users.username, users.company
             FROM audit_tasks
-            ORDER BY created_at DESC
+            LEFT JOIN users ON users.user_id = audit_tasks.user_id
+            WHERE (? IS NULL OR audit_tasks.user_id = ?)
+            ORDER BY audit_tasks.created_at DESC
             LIMIT ?
             """,
-            (max(1, min(limit, 200)),),
+            (user_id, user_id, max(1, min(limit, 200))),
         ).fetchall()
     tasks: list[dict[str, Any]] = []
     for row in rows:
@@ -262,18 +314,20 @@ def list_audit_tasks(limit: int = 50) -> list[dict[str, Any]]:
         tasks.append(
             {
                 "taskId": row["task_id"],
+                "userId": row["user_id"] or "",
                 "status": row["status"],
                 "currentStep": row["current_step"],
                 "progress": row["progress"],
                 "brandName": request.get("brandName", ""),
                 "niceClass": request.get("niceClass", ""),
-                "targetCountries": request.get("targetCountries", []),
+                "targetCountries": request.get("targetCountries") or request.get("targetMarkets", []),
                 "riskLevel": result.get("riskLevel") if result else "",
                 "riskScore": result.get("riskScore") if result else 0,
                 "manualReviewRequired": bool(result.get("manualReviewRequired")) if result else False,
                 "createdAt": row["created_at"],
                 "updatedAt": row["updated_at"],
                 "errorMessage": row["error_message"] or "",
+                "owner": row["company"] or row["username"] or "当前团队",
             }
         )
     return tasks

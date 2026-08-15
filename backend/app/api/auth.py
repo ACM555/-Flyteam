@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
 from app.database import (
     authenticate_user,
     create_session,
@@ -53,6 +54,18 @@ def admin_user(user: dict = Depends(current_user)) -> dict:
     return user
 
 
+def _auth_result(row: dict) -> dict:
+    token = create_session(row["user_id"])
+    user = {
+        "userId": row["user_id"],
+        "username": row["username"],
+        "role": row["role"],
+        "company": row["company"],
+        "createdAt": row["created_at"],
+    }
+    return {"token": token, "user": user}
+
+
 @router.post("/register")
 def register(payload: RegisterRequest) -> dict:
     try:
@@ -68,15 +81,24 @@ def login(payload: LoginRequest) -> dict:
     row = authenticate_user(payload.username, payload.password)
     if row is None:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    token = create_session(row["user_id"])
-    user = {
-        "userId": row["user_id"],
-        "username": row["username"],
-        "role": row["role"],
-        "company": row["company"],
-        "createdAt": row["created_at"],
-    }
-    return _success({"token": token, "user": user}, "登录成功")
+    return _success(_auth_result(row), "登录成功")
+
+
+@router.get("/demo/status")
+def demo_status() -> dict:
+    """Expose only whether the explicitly enabled demo entry is available."""
+
+    return _success({"enabled": settings.DEMO_MODE})
+
+
+@router.post("/demo")
+def demo_login() -> dict:
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=404, detail="演示入口未启用")
+    row = authenticate_user(settings.DEMO_USERNAME, settings.DEMO_PASSWORD)
+    if row is None:
+        raise HTTPException(status_code=503, detail="演示账号尚未初始化，请重启后端")
+    return _success(_auth_result(row), "进入演示")
 
 
 @router.get("/me")

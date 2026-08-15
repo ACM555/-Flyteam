@@ -9,23 +9,32 @@ import httpx
 from app.core.config import settings
 
 
-class BailianConfigurationError(RuntimeError):
+class GLMConfigurationError(RuntimeError):
     pass
 
 
-class BailianClient:
+class GLMClient:
+    """智谱 GLM 的 OpenAI-compatible chat completions client."""
+
     def _headers(self) -> dict[str, str]:
-        if not settings.BAILIAN_API_KEY or not settings.bailian_base_url:
-            raise BailianConfigurationError("百炼模型尚未配置，请联系管理员。")
-        return {"Authorization": f"Bearer {settings.BAILIAN_API_KEY}", "Content-Type": "application/json"}
+        if not settings.GLM_API_KEY or not settings.glm_base_url:
+            raise GLMConfigurationError("GLM 模型尚未配置，请设置 GLM_API_KEY。")
+        return {
+            "Authorization": f"Bearer {settings.GLM_API_KEY}",
+            "Content-Type": "application/json",
+        }
 
     def _payload(self, messages: list[dict[str, Any]], stream: bool) -> dict[str, Any]:
-        return {"model": settings.BAILIAN_MODEL, "messages": messages, "stream": stream}
+        return {
+            "model": settings.GLM_MODEL,
+            "messages": messages,
+            "stream": stream,
+        }
 
     async def complete(self, messages: list[dict[str, Any]]) -> str:
         async with httpx.AsyncClient(timeout=90) as client:
             response = await client.post(
-                f"{settings.bailian_base_url}/chat/completions",
+                f"{settings.glm_base_url}/chat/completions",
                 headers=self._headers(),
                 json=self._payload(messages, stream=False),
             )
@@ -33,14 +42,14 @@ class BailianClient:
         choices = response.json().get("choices", [])
         content = choices[0].get("message", {}).get("content", "") if choices else ""
         if not isinstance(content, str) or not content.strip():
-            raise RuntimeError("模型没有返回可用回答。")
+            raise RuntimeError("GLM 模型没有返回可用回答。")
         return content.strip()
 
     async def stream(self, messages: list[dict[str, Any]]) -> AsyncIterator[str]:
         async with httpx.AsyncClient(timeout=90) as client:
             async with client.stream(
                 "POST",
-                f"{settings.bailian_base_url}/chat/completions",
+                f"{settings.glm_base_url}/chat/completions",
                 headers={**self._headers(), "Accept": "text/event-stream"},
                 json=self._payload(messages, stream=True),
             ) as response:

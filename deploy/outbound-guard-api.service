@@ -1,0 +1,21 @@
+[Unit]
+Description=Outbound Guard FastAPI service
+After=network.target
+
+[Service]
+Type=simple
+User=outbound-guard
+Group=outbound-guard
+WorkingDirectory=/opt/outbound-guard/backend
+EnvironmentFile=/opt/outbound-guard/backend/.env
+ExecStart=/opt/outbound-guard/backend/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/opt/outbound-guard/backend/data /opt/outbound-guard/backend/uploads /opt/outbound-guard/backend/reports
+
+[Install]
+WantedBy=multi-user.target

@@ -10,7 +10,7 @@ from app.api.auth import current_user
 from app.core.config import settings
 from app.models.assistant import AssistantChatRequest, AssistantChatResponse, AssistantUploadResponse
 from app.services.assistant_orchestrator import AssistantOrchestrator
-from app.services.bailian_client import BailianConfigurationError
+from app.services.glm_client import GLMConfigurationError
 
 
 router = APIRouter(prefix="/assistant", tags=["AI 助手"])
@@ -21,7 +21,7 @@ orchestrator = AssistantOrchestrator()
 async def chat(payload: AssistantChatRequest, user: dict = Depends(current_user)) -> AssistantChatResponse:
     try:
         return await orchestrator.answer(payload, user["userId"])
-    except BailianConfigurationError as error:
+    except GLMConfigurationError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
@@ -32,7 +32,7 @@ async def chat_stream(payload: AssistantChatRequest, user: dict = Depends(curren
             async for delta in orchestrator.stream(payload, user["userId"]):
                 yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
-        except BailianConfigurationError as error:
+        except GLMConfigurationError as error:
             yield f"data: {json.dumps({'error': str(error)}, ensure_ascii=False)}\n\n"
         except Exception:
             yield "data: {\"error\": \"AI 服务暂时不可用，请稍后重试。\"}\n\n"

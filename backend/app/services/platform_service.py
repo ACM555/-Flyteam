@@ -292,7 +292,11 @@ def get_data_source_status() -> list[dict[str, Any]]:
     return DATA_SOURCE_STATUS
 
 
-def build_report_center(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_report_center(
+    tasks: list[dict[str, Any]],
+    *,
+    include_demo: bool = False,
+) -> list[dict[str, Any]]:
     reports = []
     for task in tasks:
         if task["status"] != "done":
@@ -309,7 +313,7 @@ def build_report_center(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "manualReviewRequired": task["manualReviewRequired"],
                 "createdAt": task["createdAt"],
                 "updatedAt": task["updatedAt"],
-                "owner": "当前团队",
+                "owner": task.get("owner") or "当前团队",
                 "status": "已归档",
                 "summary": "包含文字近似、图形近似、绝对理由、跨类驰护、文化禁忌和注册路径建议。",
             }
@@ -317,6 +321,9 @@ def build_report_center(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     if reports:
         return reports
+
+    if not include_demo:
+        return []
 
     return [
         {

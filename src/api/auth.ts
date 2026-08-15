@@ -31,6 +31,16 @@ export async function login(payload: LoginPayload): Promise<AuthResult> {
   return res.data
 }
 
+export async function demoLogin(): Promise<AuthResult> {
+  const res = (await request.post('/auth/demo')) as UnifiedResponse<AuthResult>
+  return res.data
+}
+
+export async function getDemoStatus(): Promise<boolean> {
+  const res = (await request.get('/auth/demo/status')) as UnifiedResponse<{ enabled: boolean }>
+  return Boolean(res.data?.enabled)
+}
+
 export async function register(payload: RegisterPayload): Promise<AuthResult> {
   const res = (await request.post('/auth/register', payload)) as UnifiedResponse<AuthResult>
   return res.data

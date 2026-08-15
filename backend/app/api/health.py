@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.audit import _task_store
 from app.core.config import settings
+from app.database import get_statistics
 
 router = APIRouter(tags=["系统"])
 
@@ -30,22 +30,13 @@ async def health_check() -> dict[str, str]:
 @router.get(
     "/statistics",
     summary="首页统计",
-    description="返回当前内存任务中的审查数量与高风险数量，用于首页统计卡片。",
+    description="返回持久化任务中的审查数量与高风险数量，用于首页统计卡片。",
 )
 async def statistics() -> dict[str, object]:
     """返回首页统计数据。"""
 
-    done_results = [
-        task.get("result")
-        for task in _task_store.values()
-        if task.get("status") == "done" and task.get("result")
-    ]
-    high_risk_count = sum(1 for result in done_results if result.get("riskLevel") == "high")
     return {
         "code": 0,
         "message": "success",
-        "data": {
-            "auditedBrands": len(done_results),
-            "highRiskBlocked": high_risk_count,
-        },
+        "data": get_statistics(),
     }

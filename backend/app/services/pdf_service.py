@@ -80,7 +80,13 @@ def build_audit_pdf(result: dict) -> bytes:
         Paragraph("Outbound-Guard 自动化初筛报告", base),
         Spacer(1, 8 * mm),
     ]
-    summary = result["summary"]
+    summary = result.get("summary") or {
+        "brandName": result.get("brandName", ""),
+        "niceClass": result.get("niceClass", ""),
+        "riskLevel": result.get("riskLevel", "low"),
+        "riskScore": result.get("riskScore", 0),
+        "submitTime": result.get("createdAt", ""),
+    }
     summary_rows = [
         ["品牌名称", _text(summary.get("brandName"))],
         ["尼斯分类", _text(summary.get("niceClass"))],
@@ -124,7 +130,27 @@ def build_audit_pdf(result: dict) -> bytes:
             )
         )
     story.append(Paragraph("冲突商标", heading))
-    conflicts = result.get("relative", {}).get("conflicts", [])
+    relative = result.get("relative") or {}
+    conflicts = relative.get("conflicts", [])
+    if not conflicts:
+        conflicts = [
+            {
+                "brandName": reference.get("title"),
+                "registeredClass": reference.get("summary"),
+                "registrationNo": reference.get("registrationNo"),
+                "similarityType": reference.get("relevance"),
+                "similarityScore": next(
+                    (
+                        rule.get("similarityScore", 0)
+                        for rule in result.get("hitRules", [])
+                        if rule.get("ruleType") == "relative" and rule.get("applicable")
+                    ),
+                    0,
+                ),
+            }
+            for reference in result.get("references", [])
+            if reference.get("refType") == "trademark"
+        ]
     if conflicts:
         conflict_rows = [["品牌", "类别", "注册/申请号", "类型", "评分"]]
         conflict_rows.extend(
@@ -195,7 +221,9 @@ def build_audit_pdf(result: dict) -> bytes:
             )
         )
     story.extend([PageBreak(), Paragraph("处置建议", heading)])
-    for item in result.get("advice", {}).get("recommendations", []):
+    advice = result.get("advice") or {}
+    recommendations = advice.get("recommendations") or result.get("suggestions", [])
+    for item in recommendations:
         story.append(
             Paragraph(
                 f"<b>[{_text(item.get('priority'))}] {_text(item.get('title'))}</b><br/>"

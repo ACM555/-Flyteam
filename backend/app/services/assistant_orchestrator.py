@@ -4,14 +4,14 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from app.models.assistant import AssistantChatRequest, AssistantChatResponse
-from app.services.bailian_client import BailianClient
+from app.services.glm_client import GLMClient
 from app.services.rag_retrieval_service import RetrievalService
 
 
 class AssistantOrchestrator:
     def __init__(self) -> None:
         self._retrieval = RetrievalService()
-        self._model = BailianClient()
+        self._model = GLMClient()
 
     def _messages(self, request: AssistantChatRequest, user_id: str) -> tuple[list[dict[str, Any]], list[str], list]:
         retrieved = self._retrieval.retrieve(request.question, user_id)

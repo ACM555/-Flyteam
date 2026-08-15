@@ -3,6 +3,8 @@ dist
 .npm-cache
 .playwright-cli
 output
+data/
+*.log
 backend/.venv
 backend/.env
 backend/.pytest_cache

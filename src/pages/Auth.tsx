@@ -5,14 +5,17 @@ import {
   FileDoneOutlined,
   GlobalOutlined,
   LockOutlined,
+  PlayCircleOutlined,
   SafetyCertificateOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { App as AntdApp, Button, Card, Form, Input, Space, Tag, Typography } from 'antd'
 import { motion } from 'motion/react'
 import { useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { getDemoStatus } from '@/api/auth'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -55,11 +58,18 @@ const trustMetrics = [
 function Auth({ mode }: AuthProps) {
   const [form] = Form.useForm<AuthFormValues>()
   const [submitting, setSubmitting] = useState(false)
+  const [demoAvailable, setDemoAvailable] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const { message } = AntdApp.useApp()
-  const { login, register } = useAuth()
+  const { demoLogin, login, register } = useAuth()
   const isRegister = mode === 'register'
+
+  useEffect(() => {
+    if (!isRegister) {
+      getDemoStatus().then(setDemoAvailable).catch(() => setDemoAvailable(false))
+    }
+  }, [isRegister])
 
   const handleFinish = async (values: AuthFormValues) => {
     setSubmitting(true)
@@ -76,6 +86,20 @@ function Auth({ mode }: AuthProps) {
       message.success(isRegister ? '注册成功' : '登录成功')
       const from = new URLSearchParams(location.search).get('from')
       navigate(from || (user.role === 'superadmin' ? '/admin' : '/'), { replace: true })
+    } catch {
+      // Request interceptor already shows the backend validation message.
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDemoLogin = async () => {
+    setSubmitting(true)
+    try {
+      const user = await demoLogin()
+      message.success('已进入比赛演示')
+      const from = new URLSearchParams(location.search).get('from')
+      navigate(from || '/submit', { replace: true })
     } catch {
       // Request interceptor already shows the backend validation message.
     } finally {
@@ -218,6 +242,17 @@ function Auth({ mode }: AuthProps) {
             <Button block htmlType="submit" loading={submitting} size="large" type="primary">
               {isRegister ? '注册并进入系统' : '登录'}
             </Button>
+            {!isRegister && demoAvailable ? (
+              <Button
+                block
+                icon={<PlayCircleOutlined />}
+                loading={submitting}
+                onClick={handleDemoLogin}
+                size="large"
+              >
+                进入比赛演示
+              </Button>
+            ) : null}
           </Form>
 
           <div className="auth-card-footer">

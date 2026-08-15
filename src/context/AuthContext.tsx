@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import {
   getMe,
   login as loginRequest,
+  demoLogin as demoLoginRequest,
   logout as logoutRequest,
   register as registerRequest,
   type AuthUser,
@@ -16,6 +17,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isAdmin: boolean
   login: (payload: LoginPayload) => Promise<AuthUser>
+  demoLogin: () => Promise<AuthUser>
   register: (payload: RegisterPayload) => Promise<AuthUser>
   logout: () => Promise<void>
 }
@@ -74,6 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistSession],
   )
 
+  const demoLogin = useCallback(async () => {
+    const result = await demoLoginRequest()
+    persistSession(result.token, result.user)
+    return result.user
+  }, [persistSession])
+
   const register = useCallback(
     async (payload: RegisterPayload) => {
       const result = await registerRequest(payload)
@@ -100,10 +108,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(user && token),
       isAdmin: user?.role === 'superadmin',
       login,
+      demoLogin,
       register,
       logout,
     }),
-    [loading, login, logout, register, token, user],
+    [demoLogin, loading, login, logout, register, token, user],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
